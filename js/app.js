@@ -13,6 +13,7 @@ const PAGES = {
   habits:    { title: 'Habits',    render: c => Habits.page(c) },
   focus:     { title: 'Focus',     render: c => Focus.page(c) },
   analytics: { title: 'Analytics', render: c => AnalyticsPage.page(c) },
+  fishbone:  { title: 'Fishbone',  render: c => Fishbone.page(c) },
   reviews:   { title: 'Reviews',   render: c => Reviews.page(c) },
   settings:  { title: 'Settings',  render: c => Settings.page(c) }
 };

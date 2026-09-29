@@ -1,0 +1,162 @@
+/* ============================================================
+   PersonalOS — Fishbone diagram styles + animations
+   ============================================================ */
+
+.fb-card { padding: 10px; }
+.fb-scroll { overflow-x: auto; border-radius: 12px; background: var(--bg); }
+.fb-svg { display: block; min-width: 100%; }
+.fb-scroll-hint { padding: 8px 10px 2px; display: none; }
+
+.fb-head-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.fb-head-stats .chip b { margin: 0 2px; }
+
+/* ---------- SVG base ---------- */
+.fb-svg text { font-family: 'Inter', sans-serif; }
+.fb-spine { stroke: var(--text); stroke-width: 5; stroke-linecap: round; }
+.fb-tail  { fill: var(--text); opacity: .9; }
+.fb-head  { fill: var(--text); opacity: .95; }
+.fb-eye { fill: var(--bg-card); stroke: var(--bg-card); }
+.fb-eye-pupil { fill: var(--bg); }
+.fb-bone { stroke-width: 4.5; stroke-linecap: round; fill: none; }
+.fb-rib { stroke-width: 1.8; opacity: .75; }
+
+.fb-effect { display: flex; flex-direction: column; justify-content: center; height: 100%; color: var(--bg); padding: 6px 4px 6px 0; }
+.fb-effect b { font-size: 15.5px; line-height: 1.25; }
+.fb-effect span { font-size: 10.5px; opacity: .8; margin-top: 3px; }
+
+/* ---------- category chip ---------- */
+.fb-chip {
+  display: flex; align-items: center; gap: 8px;
+  height: 100%; padding: 0 12px;
+  background: var(--cc, var(--c-primary));
+  color: #fff; border-radius: 12px;
+  cursor: pointer; user-select: none;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--cc) 35%, transparent);
+  transition: transform .15s ease, filter .15s ease;
+}
+.fb-chip:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.fb-chip i { font-size: 15px; }
+.fb-chip-title { flex: 1; font-size: 11.5px; font-weight: 700; line-height: 1.15; }
+.fb-chip-meta { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; }
+.fb-chip-meta .fb-chevron { transition: transform .25s ease; opacity: .85; }
+.fb-cat.collapsed .fb-chip-meta .fb-chevron { transform: rotate(-90deg); }
+
+/* ---------- causes ---------- */
+.fb-causes { display: flex; flex-direction: column; overflow: hidden; }
+.fb-cause {
+  display: flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 2px 0 4px;
+  font-size: 11.5px; line-height: 1.25;
+  border-radius: 8px;
+  transition: background .15s ease, opacity .3s ease;
+}
+.fb-cause:hover { background: var(--bg-hover); }
+.fb-cause-text { flex: 1; color: var(--text); }
+.fb-cause.solved .fb-cause-text { text-decoration: line-through; color: var(--c-success); opacity: .85; }
+
+.fb-cause-btns { display: flex; gap: 3px; opacity: 0; transition: opacity .15s ease; }
+.fb-cause:hover .fb-cause-btns, .fb-cause.solved .fb-cause-btns { opacity: 1; }
+.fb-btn {
+  width: 22px; height: 22px; flex: none;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--bg-card); color: var(--text-muted);
+  font-size: 10px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all .12s ease;
+}
+.fb-add:hover { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.fb-solve:hover, .fb-cause.solved .fb-solve { background: var(--c-success); border-color: var(--c-success); color: #fff; }
+
+/* ---------- hover spotlight ---------- */
+.fb-svg.has-hover .fb-cat { opacity: .2; transition: opacity .2s ease; }
+.fb-svg.has-hover .fb-cat:hover { opacity: 1; }
+.fb-svg .fb-cat { transition: opacity .2s ease; }
+.fb-svg.has-hover .fb-spine, .fb-svg.has-hover .fb-head, .fb-svg.has-hover .fb-tail,
+.fb-svg.has-hover .fb-flow { opacity: .35; }
+
+/* ---------- fold / unfold causes ---------- */
+.fb-causes-fog { overflow: hidden; }
+.fb-causes-fog > div { max-height: var(--mh); transition: max-height .35s ease, opacity .3s ease; }
+.fb-cat.collapsed .fb-causes-fog > div { max-height: 0 !important; opacity: 0; }
+.fb-cat.collapsed .fb-ribs { opacity: 0; transition: opacity .3s ease; }
+.fb-ribs { transition: opacity .3s ease; }
+
+/* ============================================================
+   ENTRANCE ANIMATION (plays when .fb-play lands on the svg)
+   ============================================================ */
+
+/* spine draws itself */
+.fb-spine { stroke-dasharray: 1000; stroke-dashoffset: 1000; }
+.fb-play .fb-spine { transition: stroke-dashoffset 1.1s ease .1s; stroke-dashoffset: 0; }
+
+/* bones unfold, staggered per category */
+.fb-bone { stroke-dasharray: 100; stroke-dashoffset: 100; }
+.fb-play .fb-bone { transition: stroke-dashoffset .65s ease var(--bd, .9s); stroke-dashoffset: 0; }
+
+/* chips pop in */
+.fb-chip { opacity: 0; transform: translateY(8px) scale(.94); }
+.fb-play .fb-chip {
+  opacity: 1; transform: none;
+  transition: opacity .4s ease var(--ad, .7s), transform .4s ease var(--ad, .7s),
+              background .15s ease;
+}
+
+/* ribs + causes slide in after their bone */
+.fb-ribs { opacity: 0; }
+.fb-play .fb-ribs { opacity: 1; transition: opacity .4s ease var(--ad, 1.2s); }
+.fb-cause { opacity: 0; transform: translateX(-10px); }
+.fb-play .fb-cause {
+  opacity: 1; transform: none;
+  transition: opacity .35s ease var(--ad, 1.3s), transform .35s ease var(--ad, 1.3s),
+              background .15s ease;
+}
+
+/* head + tail fade in last */
+.fb-head, .fb-tail, .fb-effect, .fb-eye, .fb-eye-pupil { opacity: 0; }
+.fb-play .fb-head, .fb-play .fb-tail, .fb-play .fb-effect, .fb-play .fb-eye, .fb-play .fb-eye-pupil {
+  opacity: .95; transition: opacity .6s ease 1.7s;
+}
+.fb-play .fb-eye { opacity: 1; }
+
+/* flowing dots along the spine (appear once spine is drawn) */
+@keyframes fbflow {
+  0%   { transform: translateX(110px); opacity: 0; }
+  8%   { opacity: .9; }
+  92%  { opacity: .9; }
+  100% { transform: translateX(1150px); opacity: 0; }
+}
+.fb-flow { opacity: 0; }
+.fb-play .fb-flow { animation: fbflow 5.5s linear infinite; animation-delay: var(--fd, 0s); }
+
+/* fish blinks now and then */
+@keyframes fbblink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.fb-eye-pupil { transform-box: fill-box; transform-origin: center; }
+.fb-play .fb-eye-pupil { animation: fbblink 4.5s ease-in-out 2.5s infinite; }
+
+/* instant render (re-renders after the first play: theme toggle, refresh) */
+.fb-noanim * { transition: none !important; }
+
+/* ---------- below the diagram ---------- */
+.fb-below { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-top: 14px; align-items: start; }
+.fb-below .fb-quote + .fb-quote { grid-column: 1 / -1; }
+.fb-takeaway p { font-size: 13.5px; color: var(--text); }
+.fb-quote { display: flex; gap: 12px; align-items: flex-start; }
+.fb-quote i { color: var(--c-primary); margin-top: 3px; }
+.fb-quote p { font-size: 13px; font-style: italic; }
+
+/* ---------- small screens ---------- */
+@media (max-width: 900px) {
+  .fb-scroll-hint { display: block; }
+  .fb-below { grid-template-columns: 1fr; }
+  .fb-head-stats { margin-top: 8px; }
+}
+
+/* ---------- respect reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .fb-spine, .fb-bone { stroke-dashoffset: 0 !important; }
+  .fb-chip, .fb-cause, .fb-ribs, .fb-head, .fb-tail, .fb-effect, .fb-eye, .fb-eye-pupil {
+    opacity: 1 !important; transform: none !important; transition: none !important;
+  }
+  .fb-flow { animation: none !important; opacity: 0 !important; }
+  .fb-eye-pupil { animation: none !important; }
+}
