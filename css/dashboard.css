@@ -1,0 +1,144 @@
+/* ============================================================
+   PersonalOS — Dashboard / Today / Analytics page layouts
+   ============================================================ */
+
+/* Dashboard top grid: score card + stat tiles */
+.dash-greeting { margin-bottom: 18px; }
+.dash-greeting h2 { font-size: 24px; margin-bottom: 2px; }
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.score-ring-wrap { position: relative; width: 170px; height: 170px; }
+.score-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.score-num { font-size: 44px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.score-denom { color: var(--text-muted); font-size: 13px; font-weight: 600; }
+
+.score-breakdown {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+.score-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--bg-hover);
+}
+.sb-label { color: var(--text-muted); font-weight: 600; }
+.sb-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Stat tiles */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.stat-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+}
+.stat-tile i {
+  width: 42px; height: 42px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+.stat-tile b { display: block; font-size: 19px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat-tile span { font-size: 12px; color: var(--text-muted); }
+
+/* Chart rows */
+.chart-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.chart-card { min-width: 0; }
+
+/* Analytics page */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.analytics-grid .chart-box { height: 240px; }
+
+.insight-list { margin-bottom: 0; }
+
+.planning-card { margin-top: 14px; }
+.planning-card .summary-grid { margin: 10px 0; }
+
+/* Today page */
+.morning-plan { margin-bottom: 6px; }
+
+.today-summary { margin-top: 26px; }
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 8px 0 14px;
+}
+.summary-grid > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: var(--bg-hover);
+}
+.summary-grid b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.summary-grid.big b { font-size: 24px; }
+.summary-grid span { font-size: 11.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.quick-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+
+/* Reviews */
+.reviews-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.mood-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.week-nav > div { text-align: center; }

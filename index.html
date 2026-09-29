@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PersonalOS</title>
+  <meta name="description" content="PersonalOS — a personal productivity operating system: plan, execute, measure, reflect, improve.">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=1.0.3">
+  <link rel="stylesheet" href="css/dashboard.css?v=1.0.3">
+  <link rel="stylesheet" href="css/responsive.css?v=1.0.3">
+</head>
+<body>
+
+  <!-- ============ SIDEBAR ============ -->
+  <div id="sidebar-overlay"></div>
+  <aside id="sidebar">
+    <div class="brand">
+      <img src="assets/icons/favicon.svg" alt="" width="30" height="30">
+      <span>Personal<b>OS</b></span>
+    </div>
+    <nav id="nav-list">
+      <!-- populated by the inline script at the bottom of <body> -->
+    </nav>
+    <div class="sidebar-foot">
+      <span id="conn-dot" class="conn-dot off" title="Connection status"></span>
+      <span id="conn-label">Not configured</span>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div id="main">
+    <header id="topbar">
+      <button id="btn-sidebar-toggle" class="btn btn-icon btn-ghost" title="Menu"><i class="fa-solid fa-bars"></i></button>
+      <h1 id="page-title">Dashboard</h1>
+      <div class="topbar-spacer"></div>
+      <button id="topbar-timer" class="btn btn-sm timer-chip" hidden title="Focus session running"></button>
+      <button id="btn-search" class="btn btn-icon btn-ghost" title="Search (Ctrl+K)"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <button id="btn-refresh" class="btn btn-icon btn-ghost" title="Sync with backend"><i class="fa-solid fa-rotate"></i></button>
+      <button id="btn-theme" class="btn btn-icon btn-ghost" title="Toggle theme"><i class="fa-solid fa-sun"></i></button>
+    </header>
+
+    <div id="setup-banner" class="banner banner-info" hidden>
+      <i class="fa-solid fa-plug-circle-exclamation"></i>
+      <span>Backend not configured yet. Connect your Google Apps Script Web App URL to load and save your data.</span>
+      <a class="btn btn-sm btn-primary" href="#/settings" onclick="Utils.pref('setupDismissed', true)">Open Settings</a>
+      <button class="btn btn-icon btn-ghost" onclick="Utils.pref('setupDismissed', true); document.getElementById('setup-banner').hidden = true" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div id="global-error" class="banner banner-error" hidden>
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="error-msg">Unable to connect to the backend.</span>
+      <button id="error-retry" class="btn btn-sm btn-primary">Retry</button>
+    </div>
+
+    <main id="pages">
+      <section class="page" id="page-dashboard" hidden></section>
+      <section class="page" id="page-today" hidden></section>
+      <section class="page" id="page-tasks" hidden></section>
+      <section class="page" id="page-goals" hidden></section>
+      <section class="page" id="page-routines" hidden></section>
+      <section class="page" id="page-habits" hidden></section>
+      <section class="page" id="page-focus" hidden></section>
+      <section class="page" id="page-analytics" hidden></section>
+      <section class="page" id="page-reviews" hidden></section>
+      <section class="page" id="page-settings" hidden></section>
+    </main>
+  </div>
+
+  <!-- ============ MOBILE BOTTOM NAV ============ -->
+  <nav id="bottom-nav">
+    <a href="#/dashboard" data-page="dashboard"><i class="fa-solid fa-gauge-high"></i><span>Home</span></a>
+    <a href="#/today" data-page="today"><i class="fa-solid fa-sun"></i><span>Today</span></a>
+    <a href="#/focus" data-page="focus"><i class="fa-solid fa-stopwatch"></i><span>Focus</span></a>
+    <a href="#/analytics" data-page="analytics"><i class="fa-solid fa-chart-line"></i><span>Stats</span></a>
+    <button id="btn-more"><i class="fa-solid fa-ellipsis"></i><span>More</span></button>
+  </nav>
+
+  <!-- ============ OVERLAYS ============ -->
+  <div id="loading-overlay" hidden>
+    <div class="spinner"></div>
+    <p id="loading-msg">Loading dashboard…</p>
+  </div>
+
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <script src="js/config.js?v=1.0.3"></script>
+  <script src="js/utils.js?v=1.0.3"></script>
+  <script src="js/api.js?v=1.0.3"></script>
+  <script src="js/analytics.js?v=1.0.3"></script>
+  <script src="js/dashboard.js?v=1.0.3"></script>
+  <script src="js/tasks.js?v=1.0.3"></script>
+  <script src="js/goals.js?v=1.0.3"></script>
+  <script src="js/routines.js?v=1.0.3"></script>
+  <script src="js/habits.js?v=1.0.3"></script>
+  <script src="js/focus.js?v=1.0.3"></script>
+  <script src="js/reviews.js?v=1.0.3"></script>
+  <script src="js/settings.js?v=1.0.3"></script>
+  <script src="js/app.js?v=1.0.3"></script>
+  <script>
+    // build the sidebar navigation (keeps HTML small, single source of truth)
+    (function () {
+      var items = [
+        ['dashboard', 'gauge-high', 'Dashboard'],
+        ['today', 'sun', 'Today'],
+        ['tasks', 'list-check', 'Tasks'],
+        ['goals', 'bullseye', 'Goals'],
+        ['routines', 'clock', 'Routines'],
+        ['habits', 'fire', 'Habits'],
+        ['focus', 'stopwatch', 'Focus'],
+        ['analytics', 'chart-line', 'Analytics'],
+        ['reviews', 'book-open', 'Reviews'],
+        ['settings', 'gear', 'Settings']
+      ];
+      document.getElementById('nav-list').innerHTML = items.map(function (it) {
+        return '<a href="#/' + it[0] + '" data-page="' + it[0] + '"><i class="fa-solid fa-' + it[1] + '"></i>' + it[2] + '</a>';
+      }).join('');
+    })();
+  </script>
+</body>
+</html>

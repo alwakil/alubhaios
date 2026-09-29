@@ -1,0 +1,186 @@
+/* ============================================================
+   PersonalOS — Goals (hierarchy: long-term → 90-day → monthly → …)
+   progress can be set manually or synced from linked tasks
+   ============================================================ */
+'use strict';
+
+const GoalProgress = {
+  /** Progress shown = manual field, or auto % from linked tasks when one exists. */
+  auto(goal) {
+    const tasks = (App.state.tasks || []).filter(t => t.goal_id === goal.id);
+    if (!tasks.length) return { pct: Utils.num(goal.progress), from: 'manual', completed: 0, remaining: 0 };
+    const done = tasks.filter(t => t.status === 'completed').length;
+    return { pct: Utils.pct(done, tasks.length), from: 'tasks', completed: done, remaining: tasks.length - done };
+  }
+};
+
+const Goals = {
+  page(container) {
+    const goals = App.state.goals || [];
+    container.innerHTML = `
+      <div class="page-head">
+        <h2>Goals</h2>
+        <button class="btn btn-primary" data-act="new">${icon('plus')} New goal</button>
+      </div>
+      <div id="goal-list" class="stack"></div>
+    `;
+    container.onclick = e => {
+      if (e.target.closest('[data-act="new"]')) return this.openForm();
+      const btn = e.target.closest('[data-goal-action]');
+      if (!btn) return;
+      const id = btn.closest('[data-id]').dataset.id;
+      const goal = goals.find(g => g.id === id);
+      if (!goal) return;
+      const act = btn.dataset.goalAction;
+      if (act === 'edit') this.openForm(goal);
+      if (act === 'delete') this.remove(goal);
+      if (act === 'add-sub') this.openForm(null, goal.id);
+      if (act === 'add-task') Tasks.openForm({ goal_id: goal.id, scheduled_date: Utils.today() });
+      if (act === 'sync') this.syncProgress(goal);
+    };
+    this.renderList();
+  },
+
+  renderList() {
+    const list = qs('#goal-list', App.container());
+    if (!list) return;
+    const goals = App.state.goals || [];
+    if (!goals.length) {
+      list.innerHTML = '';
+      list.appendChild(el(emptyState('bullseye', 'No goals yet',
+        'Create your first goal to start tracking progress.',
+        `<button class="btn btn-primary" data-act="new">${icon('plus')} Create goal</button>`)));
+      return;
+    }
+    const roots = goals.filter(g => !g.parent_goal_id || !goals.some(x => x.id === g.parent_goal_id));
+    list.innerHTML = roots.map(g => this.goalCard(g, 0)).join('');
+  },
+
+  goalCard(g, depth) {
+    const goals = App.state.goals || [];
+    const children = goals.filter(x => x.parent_goal_id === g.id)
+      .sort((a, b) => String(a.target_date).localeCompare(String(b.target_date)));
+    const prog = GoalProgress.auto(g);
+    const daysLeft = g.target_date ? Utils.addDays(g.target_date, 1) && Math.round((Utils.parseDate(g.target_date) - Utils.parseDate(Utils.today())) / 86400000) : null;
+    return `
+      <div class="goal-block" data-id="${g.id}" style="margin-left:${depth * 18}px">
+        <div class="card goal-card ${g.status === 'completed' ? 'is-done' : ''}">
+          <div class="goal-head">
+            <div>
+              <div class="goal-title">${depth ? icon('corner-down-right', 'fa-xs muted') : icon('bullseye', 'fa-xs')} ${Utils.esc(g.title)}</div>
+              <div class="task-meta">
+                ${g.category ? chip(g.category, Utils.categoryColor(g.category)) : ''}
+                ${chip(g.status || 'active', g.status === 'completed' ? '#10b981' : g.status === 'paused' ? '#64748b' : '#6366f1')}
+                ${g.target_date ? chip(daysLeft !== null && daysLeft < 0 ? 'target passed' : daysLeft + ' days left', daysLeft !== null && daysLeft < 0 ? '#ef4444' : '#64748b') : ''}
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="btn btn-icon btn-ghost" data-goal-action="add-task" title="Add linked task">${icon('plus')}</button>
+              <button class="btn btn-icon btn-ghost" data-goal-action="add-sub" title="Add sub-goal">${icon('diagram-project')}</button>
+              <button class="btn btn-icon btn-ghost" data-goal-action="sync" title="Sync progress from tasks">${icon('rotate')}</button>
+              <button class="btn btn-icon btn-ghost" data-goal-action="edit" title="Edit">${icon('pencil')}</button>
+              <button class="btn btn-icon btn-ghost danger" data-goal-action="delete" title="Delete">${icon('trash')}</button>
+            </div>
+          </div>
+          ${g.description ? `<p class="muted goal-desc">${Utils.esc(g.description)}</p>` : ''}
+          <div class="goal-progress-row">
+            <div class="progress-bar big"><div class="progress-fill" style="width:${prog.pct}%"></div></div>
+            <b class="goal-pct">${prog.pct}%</b>
+          </div>
+          <div class="muted goal-stats">
+            ${prog.from === 'tasks'
+              ? `Completed: ${prog.completed} · Remaining: ${prog.remaining} (auto from tasks)`
+              : `Manual progress · ${prog.completed ? '' : 'link tasks to auto-track'}`}
+          </div>
+        </div>
+        ${children.map(c => this.goalCard(c, depth + 1)).join('')}
+      </div>`;
+  },
+
+  async syncProgress(goal) {
+    const tasks = (App.state.tasks || []).filter(t => t.goal_id === goal.id);
+    if (!tasks.length) return toast('No tasks linked to this goal yet.', 'warn');
+    const pct = Utils.pct(tasks.filter(t => t.status === 'completed').length, tasks.length);
+    try {
+      const rec = await API.updateGoal(goal.id, { progress: pct });
+      App.replaceRecord('goals', rec);
+      App.refreshCurrent();
+      toast(`Progress synced to ${pct}%`, 'success');
+    } catch (e) { App.handleError(e); }
+  },
+
+  async remove(goal) {
+    const children = (App.state.goals || []).filter(g => g.parent_goal_id === goal.id);
+    const ok = await confirmDialog({
+      title: 'Delete goal?',
+      message: `Are you sure you want to delete "<b>${Utils.esc(goal.title)}</b>"?` +
+        (children.length ? ` Its ${children.length} sub-goal(s) will become top-level goals.` : '') +
+        ' Linked tasks stay but lose their goal connection.'
+    });
+    if (!ok) return;
+    try {
+      await API.deleteGoal(goal.id);
+      App.state.goals = App.state.goals.filter(x => x.id !== goal.id);
+      App.state.goals.forEach(g => { if (g.parent_goal_id === goal.id) g.parent_goal_id = ''; });
+      (App.state.tasks || []).forEach(t => { if (t.goal_id === goal.id) t.goal_id = ''; });
+      App.refreshCurrent();
+      toast('Goal deleted', 'success');
+    } catch (e) { App.handleError(e); }
+  },
+
+  openForm(existing, parentId) {
+    const g = existing || {};
+    const goals = (App.state.goals || []).filter(x => !existing || x.id !== existing.id);
+    const m = openModal({
+      title: existing ? 'Edit goal' : 'New goal',
+      body: `
+        <form id="goal-form">
+          <label class="field"><span>Title *</span>
+            <input name="title" required maxlength="200" value="${Utils.esc(g.title || '')}" placeholder="e.g. Web Security Mastery"></label>
+          <label class="field"><span>Description</span>
+            <textarea name="description" rows="2">${Utils.esc(g.description || '')}</textarea></label>
+          <div class="field-row">
+            <label class="field"><span>Category</span>
+              <select name="category">${CONFIG.CATEGORIES.map(c => `<option ${g.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+            <label class="field"><span>Target date</span>
+              <input type="date" name="target_date" value="${Utils.esc(g.target_date || '')}"></label>
+          </div>
+          <div class="field-row">
+            <label class="field"><span>Progress ${existing ? '%' : '% (optional)'}</span>
+              <input type="number" min="0" max="100" name="progress" value="${Utils.esc(g.progress != null ? g.progress : 0)}"></label>
+            <label class="field"><span>Status</span>
+              <select name="status">${CONFIG.GOAL_STATUSES.map(s => `<option value="${s}" ${(g.status || 'active') === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+          </div>
+          <label class="field"><span>Parent goal (builds the hierarchy)</span>
+            <select name="parent_goal_id"><option value="">— none (top level) —</option>
+              ${goals.map(x => `<option value="${x.id}" ${g.parent_goal_id === x.id || (!existing && parentId === x.id) ? 'selected' : ''}>${Utils.esc(x.title)}</option>`).join('')}
+            </select></label>
+        </form>`,
+      footer: `
+        <button class="btn btn-ghost" data-cancel>Cancel</button>
+        <button class="btn btn-primary" data-save>${existing ? 'Save changes' : 'Create goal'}</button>`
+    });
+    qs('[data-cancel]', m.overlay).addEventListener('click', m.close);
+    qs('[data-save]', m.overlay).addEventListener('click', () => {
+      const form = qs('#goal-form', m.overlay);
+      if (!form.reportValidity()) return;
+      const fd = new FormData(form);
+      const data = {
+        title: fd.get('title').trim(),
+        description: fd.get('description'),
+        category: fd.get('category'),
+        target_date: fd.get('target_date') || '',
+        progress: Utils.clamp(Utils.num(fd.get('progress')), 0, 100),
+        status: fd.get('status'),
+        parent_goal_id: fd.get('parent_goal_id')
+      };
+      const save = existing ? API.updateGoal(g.id, data) : API.createGoal(data);
+      save.then(rec => {
+        App.replaceRecord('goals', rec);
+        m.close();
+        App.refreshCurrent();
+        toast(existing ? 'Goal updated' : 'Goal created', 'success');
+      }).catch(e => App.handleError(e));
+    });
+  }
+};

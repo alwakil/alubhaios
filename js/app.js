@@ -1,0 +1,247 @@
+/* ============================================================
+   PersonalOS — App shell
+   State, hash router, data loading, theme, search, error handling.
+   ============================================================ */
+'use strict';
+
+const PAGES = {
+  dashboard: { title: 'Dashboard', render: c => Dashboard.render(c) },
+  today:     { title: 'Today',     render: c => Dashboard.renderToday(c) },
+  tasks:     { title: 'Tasks',     render: c => Tasks.page(c) },
+  goals:     { title: 'Goals',     render: c => Goals.page(c) },
+  routines:  { title: 'Routines',  render: c => Routines.page(c) },
+  habits:    { title: 'Habits',    render: c => Habits.page(c) },
+  focus:     { title: 'Focus',     render: c => Focus.page(c) },
+  analytics: { title: 'Analytics', render: c => AnalyticsPage.page(c) },
+  reviews:   { title: 'Reviews',   render: c => Reviews.page(c) },
+  settings:  { title: 'Settings',  render: c => Settings.page(c) }
+};
+
+const App = {
+  state: { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [] },
+  settings: {},
+  current: 'dashboard',
+  theme: 'dark',
+  online: false,
+  _loadingCount: 0,
+
+  /* ---------------- boot ---------------- */
+  async init() {
+    this.theme = Utils.pref('theme') || 'dark';
+    this.applyTheme(this.theme);
+    Focus.init();
+
+    qs('#nav-list').addEventListener('click', e => {
+      const a = e.target.closest('[data-page]');
+      if (a) this.closeSidebar();
+    });
+    qs('#btn-sidebar-toggle').addEventListener('click', () => this.toggleSidebar());
+    qs('#sidebar-overlay').addEventListener('click', () => this.closeSidebar());
+    qs('#btn-more').addEventListener('click', () => this.toggleSidebar());
+
+    qs('#btn-theme').addEventListener('click', () => this.setTheme(this.theme === 'dark' ? 'light' : 'dark'));
+    qs('#btn-refresh').addEventListener('click', () => { toast('Syncing…', 'info'); this.reload(); });
+    qs('#btn-search').addEventListener('click', () => openSearch());
+    qs('#topbar-timer').addEventListener('click', () => { location.hash = '#/focus'; });
+    qs('#error-retry').addEventListener('click', () => { this.hideError(); this.reload(); });
+
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
+      else if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName)) {
+        e.preventDefault(); openSearch();
+      }
+    });
+    window.addEventListener('online', () => { this.online = true; this.updateConnUI(); });
+    window.addEventListener('offline', () => { this.online = false; this.updateConnUI(); });
+    window.addEventListener('hashchange', () => this.route());
+
+    this.online = navigator.onLine;
+    await this.reload();
+  },
+
+  /* ---------------- data ---------------- */
+  async reload() {
+    this.setLoading(true, 'Loading dashboard…');
+    try {
+      if (!API.configured()) {
+        this.state = { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [] };
+        this.settings = Object.assign({}, CONFIG.DEFAULTS);
+        this.online = false;
+        this.showSetupBanner();
+      } else {
+        const data = await API.getAll();
+        ['tasks', 'goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews']
+          .forEach(k => { this.state[k] = data[k] || []; });
+        this.settings = Object.assign({}, CONFIG.DEFAULTS, data.settings || {});
+        this.online = true;
+        this.hideError();
+        this.hideSetupBanner();
+      }
+    } catch (e) {
+      this.online = false;
+      this.showError(e.message);
+    }
+    this.setLoading(false);
+    this.updateConnUI();
+    this.route();
+  },
+
+  container() { return qs('#page-' + this.current); },
+
+  route() {
+    let page = (location.hash || '#/dashboard').replace(/^#\//, '');
+    if (!PAGES[page]) page = 'dashboard';
+    this.current = page;
+    Charts.destroyAll();
+    qsa('.page').forEach(p => { p.hidden = p.id !== 'page-' + page; });
+    const section = qs('#page-' + page);
+    try {
+      PAGES[page].render(section);
+    } catch (e) {
+      console.error('Render failed on page "' + page + '"', e);
+      section.innerHTML = emptyState('bug', 'This view failed to render', String(e.message || e),
+        `<button class="btn btn-primary" onclick="App.reload()">Reload</button>`);
+    }
+    qs('#page-title').textContent = PAGES[page].title;
+    document.title = PAGES[page].title + ' — ' + CONFIG.APP_NAME;
+    qsa('#nav-list a, #bottom-nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  },
+
+  refreshCurrent() {
+    Charts.destroyAll();
+    const section = this.container();
+    if (!section) return;
+    try { PAGES[this.current].render(section); }
+    catch (e) {
+      console.error('Render failed', e);
+      toast('Could not refresh this view: ' + (e.message || e), 'error');
+    }
+  },
+
+  /* optimistic-safe local mutation used by all CRUD modules */
+  replaceRecord(listName, rec) {
+    if (!rec || !rec.id) return;
+    const list = this.state[listName] || [];
+    const i = list.findIndex(x => x.id === rec.id);
+    if (i > -1) list[i] = rec; else list.push(rec);
+  },
+
+  /* ---------------- UI states ---------------- */
+  setLoading(on, msg) {
+    this._loadingCount = Math.max(0, this._loadingCount + (on ? 1 : -1));
+    const ov = qs('#loading-overlay');
+    if (!ov) return;
+    ov.hidden = this._loadingCount === 0;
+    if (msg) qs('#loading-msg', ov).textContent = msg;
+  },
+
+  showError(message) {
+    const b = qs('#global-error');
+    b.hidden = false;
+    qs('#error-msg', b).textContent = message || 'Something went wrong.';
+  },
+  hideError() { const b = qs('#global-error'); if (b) b.hidden = true; },
+
+  showSetupBanner() {
+    const b = qs('#setup-banner');
+    if (Utils.pref('setupDismissed')) { b.hidden = true; return; }
+    b.hidden = false;
+  },
+  hideSetupBanner() { qs('#setup-banner').hidden = true; },
+
+  updateConnUI() {
+    const dot = qs('#conn-dot');
+    const label = qs('#conn-label');
+    let cls = 'off', text = 'Not configured';
+    if (API.configured()) {
+      cls = this.online ? 'online' : 'offline';
+      text = this.online ? 'Connected' : 'Offline';
+    }
+    if (dot) { dot.className = 'conn-dot ' + cls; dot.title = text; }
+    if (label) label.textContent = text;
+  },
+
+  /* ---------------- theme ---------------- */
+  applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    const btn = qs('#btn-theme');
+    if (btn) btn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon');
+  },
+  setTheme(t) {
+    this.theme = t;
+    Utils.pref('theme', t);
+    this.applyTheme(t);
+    this.refreshCurrent();
+  },
+
+  /* ---------------- mobile sidebar ---------------- */
+  toggleSidebar() { document.body.classList.toggle('sidebar-open'); },
+  closeSidebar() { document.body.classList.remove('sidebar-open'); },
+
+  handleError(e) {
+    console.error(e);
+    toast(e.message || 'Something went wrong.', 'error');
+    if (e.code === 'NETWORK') this.showError(e.message);
+  }
+};
+window.App = App;
+
+/* ============================================================
+   Global search (Ctrl+K or /)
+   ============================================================ */
+function openSearch() {
+  const m = openModal({
+    title: icon('magnifying-glass') + ' Search everything',
+    wide: true,
+    body: `
+      <input type="search" id="global-search" placeholder="Search tasks, goals, routines, habits, projects…" autocomplete="off">
+      <div id="search-results" class="search-results"></div>`
+  });
+  const input = qs('#global-search', m.overlay);
+  const results = qs('#search-results', m.overlay);
+
+  const run = Utils.debounce(() => {
+    const q = input.value.trim().toLowerCase();
+    if (!q) { results.innerHTML = `<p class="muted small">Type to search across all your data.</p>`; return; }
+    const s = App.state;
+    const match = (o, fields) => fields.some(f => String(o[f] || '').toLowerCase().includes(q));
+
+    const groups = [
+      { name: 'Tasks', icon: 'list-check', items: s.tasks.filter(t => match(t, ['title', 'description', 'category', 'project_id'])), page: 'tasks', sub: t => `${t.status} · ${t.priority}${t.project_id ? ' · ' + t.project_id : ''}` },
+      { name: 'Goals', icon: 'bullseye', items: s.goals.filter(g => match(g, ['title', 'description', 'category'])), page: 'goals', sub: g => `${g.status || 'active'} · ${GoalProgress.auto(g).pct}%` },
+      { name: 'Routines', icon: 'clock', items: s.routines.filter(r => match(r, ['title', 'description', 'category'])), page: 'routines', sub: r => `${r.target_time || ''} · ${r.days || ''}` },
+      { name: 'Habits', icon: 'fire', items: s.habits.filter(h => match(h, ['title'])), page: 'habits', sub: h => `${h.frequency || 'daily'} · 🔥${Analytics.habitStreaks(h.id).current}` },
+      { name: 'Projects', icon: 'folder', items: [], page: 'tasks', sub: () => '' }
+    ];
+    // projects = distinct task project ids
+    const projects = {};
+    s.tasks.forEach(t => { if (t.project_id) projects[t.project_id] = (projects[t.project_id] || 0) + 1; });
+    groups[4].items = Object.keys(projects).filter(p => p.toLowerCase().includes(q)).map(p => ({ title: p, _sub: projects[p] + ' tasks' }));
+    groups[4].sub = p => p._sub;
+
+    let html = '';
+    groups.forEach(g => {
+      if (!g.items.length) return;
+      html += `<div class="search-group"><div class="search-group-name">${icon(g.icon)} ${g.name}</div>` +
+        g.items.slice(0, 8).map(o => `
+          <button class="search-item" data-page="${g.page}" data-q="${Utils.esc(q)}">
+            <span class="si-title">${Utils.esc(o.title)}</span>
+            <span class="muted small">${Utils.esc(g.sub(o))}</span>
+          </button>`).join('') + `</div>`;
+    });
+    results.innerHTML = html || `<p class="muted">No results for "${Utils.esc(q)}".</p>`;
+    qsa('.search-item', results).forEach(b => b.addEventListener('click', () => {
+      m.close();
+      if (b.dataset.page === 'tasks') { Tasks.filter.search = b.dataset.q; Tasks.filter.status = ''; }
+      location.hash = '#/' + b.dataset.page;
+      App.route();
+    }));
+  }, 150);
+
+  input.addEventListener('input', run);
+  run();
+  setTimeout(() => input.focus(), 100);
+}
+
+/* ---------------- go ---------------- */
+document.addEventListener('DOMContentLoaded', () => App.init());
