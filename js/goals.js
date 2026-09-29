@@ -74,7 +74,7 @@ const Goals = {
               <div class="goal-title">${depth ? icon('corner-down-right', 'fa-xs muted') : icon('bullseye', 'fa-xs')} ${Utils.esc(g.title)}</div>
               <div class="task-meta">
                 ${g.category ? chip(g.category, Utils.categoryColor(g.category)) : ''}
-                ${chip(g.status || 'active', g.status === 'completed' ? '#10b981' : g.status === 'paused' ? '#64748b' : '#6366f1')}
+                ${chip(g.status || 'active', g.status === 'completed' ? '#10b981' : g.status === 'paused' ? '#64748b' : 'var(--c-primary)')}
                 ${g.target_date ? chip(daysLeft !== null && daysLeft < 0 ? 'target passed' : daysLeft + ' days left', daysLeft !== null && daysLeft < 0 ? '#ef4444' : '#64748b') : ''}
               </div>
             </div>

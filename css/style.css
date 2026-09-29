@@ -4,35 +4,39 @@
    ============================================================ */
 
 :root {
-  --bg: #0f1117;
-  --bg-soft: #14171f;
-  --bg-card: #181c26;
-  --bg-hover: #1f2431;
-  --border: #262c3a;
-  --text: #e7eaf1;
-  --text-muted: #98a1b3;
-  --c-primary: #6366f1;
-  --c-primary-soft: #6366f126;
+  /* "Data Analytics" palette (octet.design) — cooled neutrals, no brown */
+  --bg: #202226;            /* deep blue-grey (between #2F292B and #42454B, cooled) */
+  --bg-soft: #25272c;
+  --bg-card: #2b2e34;       /* #42454B "Smoking Night Blue" family */
+  --bg-hover: #34373f;
+  --border: #3c4048;
+  --text: #e9ebee;
+  --text-muted: #9a9ea6;    /* #989D9E "Pencil Sketch" */
+  --c-primary: #c6ced7;     /* #C6CED7 "Nefarious Blue" */
+  --on-primary: #26282e;    /* text/icon color on primary buttons */
+  --c-primary-soft: rgba(198, 206, 215, 0.13);
   --c-success: #10b981;
   --c-warn: #f59e0b;
   --c-danger: #ef4444;
-  --chart-text: #98a1b3;
-  --chart-grid: rgba(150, 160, 185, 0.16);
+  --chart-text: #9a9ea6;
+  --chart-grid: rgba(154, 158, 166, 0.16);
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   --radius: 14px;
   --sidebar-w: 240px;
 }
 
 [data-theme="light"] {
-  --bg: #f2f4f9;
-  --bg-soft: #e9edf5;
-  --bg-card: #ffffff;
-  --bg-hover: #f0f2f8;
-  --border: #e2e7f0;
-  --text: #1b2233;
-  --text-muted: #5d6779;
-  --c-primary-soft: #6366f11f;
-  --chart-text: #5d6779;
+  --bg: #e8ecef;            /* "Nefarious Blue" tint */
+  --bg-soft: #dde2e7;
+  --bg-card: #f8fafb;
+  --bg-hover: #edf0f3;
+  --border: #d4dade;
+  --text: #303439;
+  --text-muted: #696c71;    /* #696C71 "Beautiful Darkness" */
+  --c-primary: #57616e;     /* steel blue-grey — readable on light backgrounds */
+  --on-primary: #f2f4f6;
+  --c-primary-soft: rgba(87, 97, 110, 0.12);
+  --chart-text: #696c71;
   --chart-grid: rgba(90, 100, 130, 0.16);
   --shadow: 0 8px 24px rgba(30, 40, 70, 0.10);
 }
@@ -218,8 +222,8 @@ a { color: var(--c-primary); text-decoration: none; }
 .btn:hover { background: var(--bg-hover); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.btn-primary { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
-.btn-primary:hover { background: #5558e8; }
+.btn-primary { background: var(--c-primary); border-color: var(--c-primary); color: var(--on-primary); }
+.btn-primary:hover { background: color-mix(in srgb, var(--c-primary) 86%, var(--on-primary)); }
 .btn-success { background: var(--c-success); border-color: var(--c-success); color: #fff; }
 .btn-danger { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
 .btn-danger:hover { background: #dc3535; }
@@ -334,7 +338,7 @@ input[readonly] { opacity: 0.7; }
   transition: all 0.15s;
 }
 .tab:hover { background: var(--bg-hover); color: var(--text); }
-.tab.active { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.tab.active { background: var(--c-primary); border-color: var(--c-primary); color: var(--on-primary); }
 
 /* ---------------- Progress bars ---------------- */
 
@@ -348,7 +352,7 @@ input[readonly] { opacity: 0.7; }
 .progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--c-primary), #8b5cf6);
+  background: linear-gradient(90deg, var(--c-primary), #8a97a8);
   transition: width 0.4s ease;
 }
 .progress-bar.big { height: 11px; }
@@ -700,7 +704,7 @@ input[readonly] { opacity: 0.7; }
   transition: all 0.12s;
 }
 .rate-btn:hover { border-color: var(--c-primary); }
-.rate-btn.selected { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.rate-btn.selected { background: var(--c-primary); border-color: var(--c-primary); color: var(--on-primary); }
 
 .focus-totals { display: flex; gap: 22px; flex-wrap: wrap; font-size: 13.5px; padding: 12px 16px; }
 
@@ -815,7 +819,7 @@ input[readonly] { opacity: 0.7; }
 /* ---------------- Misc ---------------- */
 
 .form-actions .btn-ghost.danger { color: var(--c-danger); }
-::selection { background: var(--c-primary); color: #fff; }
+::selection { background: var(--c-primary); color: var(--on-primary); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }

@@ -12,7 +12,7 @@
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const CATEGORY_COLORS = {
-  Learning: '#6366f1',
+  Learning: '#6d83a6',
   Projects: '#10b981',
   Work: '#f59e0b',
   Personal: '#ec4899',

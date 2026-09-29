@@ -138,7 +138,7 @@ const Fishbone = {
         </div>
         <div class="fb-head-stats">
           <span class="chip" style="--chip-c:#10b981">${icon('circle-check')} Solved <b id="fb-solved-count">${solved.size}/${totalCauses}</b></span>
-          <span class="chip" style="--chip-c:#6366f1">${icon('hand-pointer')} Hover to focus · click a header to fold</span>
+          <span class="chip" style="--chip-c:var(--c-primary)">${icon('hand-pointer')} Hover to focus · click a header to fold</span>
         </div>
       </div>
 
@@ -204,7 +204,7 @@ const Fishbone = {
 
     /* flowing dots toward the problem */
     for (let i = 0; i < 5; i++) {
-      g.push(`<circle class="fb-flow" cx="0" cy="${this.SPINE_Y}" r="4" style="--fd:${(i * 1.2)}s" fill="#6366f1"/>`);
+      g.push(`<circle class="fb-flow" cx="0" cy="${this.SPINE_Y}" r="4" style="--fd:${(i * 1.2)}s" style="fill: var(--c-primary)"/>`);
     }
 
     /* tail + head */

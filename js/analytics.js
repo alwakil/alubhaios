@@ -546,7 +546,7 @@ const AnalyticsPage = {
       data: {
         labels: daily.map(d => d.date.slice(5)),
         datasets: [
-          { label: 'Planned', data: daily.map(d => d.tasksPlanned), backgroundColor: '#6366f1', borderRadius: 3 },
+          { label: 'Planned', data: daily.map(d => d.tasksPlanned), backgroundColor: '#8a97a8', borderRadius: 3 },
           { label: 'Completed', data: daily.map(d => d.tasksCompletedAt), backgroundColor: '#10b981', borderRadius: 3 },
           { label: 'Incomplete', data: daily.map(d => Math.max(0, d.tasksPlanned - d.tasksCompleted)), backgroundColor: '#ef4444aa', borderRadius: 3 }
         ]
@@ -593,7 +593,7 @@ const AnalyticsPage = {
       data: {
         labels: last14.map(d => d.date.slice(5)),
         datasets: [
-          { label: 'Planned', data: last14.map(d => d.plannedMinutes), backgroundColor: '#6366f1', borderRadius: 3 },
+          { label: 'Planned', data: last14.map(d => d.plannedMinutes), backgroundColor: '#8a97a8', borderRadius: 3 },
           { label: 'Actual', data: last14.map(d => d.actualMinutes), backgroundColor: '#f59e0b', borderRadius: 3 }
         ]
       },

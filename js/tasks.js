@@ -149,7 +149,7 @@ const Tasks = {
           ${icon(done ? 'check' : '')}
         </button>
         <div class="task-main">
-          <div class="task-title">${Utils.esc(t.title)} ${isPriority ? chip('top priority', '#6366f1') : ''}</div>
+          <div class="task-title">${Utils.esc(t.title)} ${isPriority ? chip('top priority', 'var(--c-primary)') : ''}</div>
           <div class="task-meta">
             ${t.category ? chip(t.category, Utils.categoryColor(t.category)) : ''}
             ${chip(t.priority || 'medium', Utils.priorityColor(t.priority))}
@@ -158,7 +158,7 @@ const Tasks = {
             ${t.estimated_minutes ? chip('est ' + Utils.fmtMinutes(t.estimated_minutes), '#64748b') : ''}
             ${t.actual_minutes ? chip('actual ' + Utils.fmtMinutes(t.actual_minutes), '#10b981') : ''}
             ${t.project_id ? chip('📂 ' + t.project_id, '#8b5cf6') : ''}
-            ${goal ? chip('🎯 ' + goal.title, '#6366f1') : ''}
+            ${goal ? chip('🎯 ' + goal.title, 'var(--c-primary)') : ''}
           </div>
         </div>
         <div class="task-actions">

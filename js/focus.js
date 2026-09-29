@@ -508,7 +508,7 @@ const Focus = {
             <div class="task-title">${Utils.esc(task ? task.title : 'Unassigned session')}${String(s.notes || "").includes("[pomodoro]") ? ' 🍅' : ''}</div>
             <div class="task-meta">
               ${chip(String(s.start_time).slice(11, 16) + ' – ' + String(s.end_time).slice(11, 16), '#64748b')}
-              ${chip(Utils.fmtMinutes(s.duration_minutes), '#6366f1')}
+              ${chip(Utils.fmtMinutes(s.duration_minutes), 'var(--c-primary)')}
               ${chip(s.category || 'Other', Utils.categoryColor(s.category))}
               <span class="stars">${Utils.stars(s.focus_rating)}</span>
               ${Utils.num(s.interruptions) ? chip(s.interruptions + ' interruptions', '#ef4444') : ''}

@@ -82,7 +82,7 @@ const Badges = {
         </div>
         <div class="fb-head-stats">
           <span class="chip" style="--chip-c:#f5c518">${icon('trophy')} <b>${unlocked}/${this.defs.length}</b> unlocked</span>
-          <span class="chip" style="--chip-c:#6366f1">${icon('bolt')} Level <b>${lv.level}</b></span>
+          <span class="chip" style="--chip-c:var(--c-primary)">${icon('bolt')} Level <b>${lv.level}</b></span>
           <span class="chip" style="--chip-c:#10b981">${icon('snowflake')} Freezes <b>${Gamify.heldFreezes()}/2</b></span>
         </div>
       </div>

@@ -333,7 +333,7 @@ const Reviews = {
           <div class="task-main">
             <div class="task-title">Week of ${Utils.fmtDate(String(r.week_start).slice(0, 10))}</div>
             <div class="task-meta">
-              ${chip('focus ' + Utils.fmtMinutes(r.focus_minutes), '#6366f1')}
+              ${chip('focus ' + Utils.fmtMinutes(r.focus_minutes), 'var(--c-primary)')}
               ${chip(`${r.completed_tasks}/${r.planned_tasks} tasks`, '#10b981')}
             </div>
             ${r.biggest_win ? `<div class="small">${icon('trophy', 'fa-xs')} ${Utils.esc(r.biggest_win)}</div>` : ''}
