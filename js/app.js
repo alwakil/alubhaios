@@ -11,6 +11,7 @@ const PAGES = {
   goals:     { title: 'Goals',     render: c => Goals.page(c) },
   routines:  { title: 'Routines',  render: c => Routines.page(c) },
   habits:    { title: 'Habits',    render: c => Habits.page(c) },
+  badges:    { title: 'Badges',    render: c => Badges.page(c) },
   focus:     { title: 'Focus',     render: c => Focus.page(c) },
   analytics: { title: 'Analytics', render: c => AnalyticsPage.page(c) },
   fishbone:  { title: 'Fishbone',  render: c => Fishbone.page(c) },
@@ -46,18 +47,77 @@ const App = {
     qs('#topbar-timer').addEventListener('click', () => { location.hash = '#/focus'; });
     qs('#error-retry').addEventListener('click', () => { this.hideError(); this.reload(); });
 
-    document.addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
-      else if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName)) {
-        e.preventDefault(); openSearch();
-      }
-    });
+    document.addEventListener('keydown', e => this.handleKeys(e));
     window.addEventListener('online', () => { this.online = true; this.updateConnUI(); });
     window.addEventListener('offline', () => { this.online = false; this.updateConnUI(); });
     window.addEventListener('hashchange', () => this.route());
 
+    // PWA service worker (skipped on file://)
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+      try { navigator.serviceWorker.register('sw.js').catch(() => { /* ignore */ }); } catch (e) { /* ignore */ }
+    }
+
+    // routine reminders (browser notifications, fire while the app is open)
+    setInterval(() => this.checkRoutineReminders(), 60000);
+
     this.online = navigator.onLine;
     await this.reload();
+  },
+
+  /** Keyboard shortcuts — ignored while typing in a field or holding modifiers. */
+  handleKeys(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); return; }
+    const t = document.activeElement;
+    if (t && (/input|textarea|select/i.test(t.tagName) || t.isContentEditable)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (qs('#modal-root .modal-overlay')) return;
+    switch (e.key.toLowerCase()) {
+      case '/': e.preventDefault(); openSearch(); break;
+      case 'n': e.preventDefault(); Tasks.openForm(); break;
+      case 'f': location.hash = '#/focus'; break;
+      case 't': location.hash = '#/today'; break;
+      case 'd': location.hash = '#/dashboard'; break;
+      case 'a': location.hash = '#/analytics'; break;
+      case 'g': location.hash = '#/goals'; break;
+      case 'b': location.hash = '#/badges'; break;
+      case '?': e.preventDefault(); this.showShortcutsHelp(); break;
+    }
+  },
+
+  showShortcutsHelp() {
+    const rows = [
+      ['N', 'New task'], ['F', 'Focus timer'], ['T', 'Today'], ['D', 'Dashboard'],
+      ['A', 'Analytics'], ['G', 'Goals'], ['B', 'Badges'], ['/', 'Search everything'],
+      ['Ctrl + K', 'Search'], ['?', 'This help']
+    ];
+    openModal({
+      title: icon('keyboard') + ' Keyboard shortcuts',
+      body: `<div class="shortcut-grid">${rows.map(r =>
+        `<div><kbd>${r[0]}</kbd><span>${r[1]}</span></div>`).join('')}</div>`
+    });
+  },
+
+  /** Notify today's routines whose start time just arrived (0–10 min window). */
+  checkRoutineReminders() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const today = Utils.today();
+    const wd = Utils.weekdayShort(today);
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    (App.state.routines || []).forEach(r => {
+      if (r.enabled === false) return;
+      const days = String(r.days || '').trim();
+      if (days !== 'Every day' && !days.split(',').map(s => s.trim()).includes(wd)) return;
+      if (!/^\d{1,2}:\d{2}/.test(String(r.target_time || ''))) return;
+      const parts = r.target_time.split(':');
+      const diff = nowMin - (Number(parts[0]) * 60 + Number(parts[1]));
+      if (diff < 0 || diff > 10) return;
+      const key = 'notified.' + today + '.' + r.id;
+      if (Utils.pref(key)) return;
+      Utils.pref(key, true);
+      notify('⏰ ' + r.target_time + ' — ' + r.title,
+        (r.duration_minutes ? Utils.fmtMinutes(r.duration_minutes) + ' — ' : '') + 'Time to start!');
+    });
   },
 
   /* ---------------- data ---------------- */
@@ -71,7 +131,9 @@ const App = {
         this.showSetupBanner();
       } else {
         const data = await API.getAll();
-        ['tasks', 'goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews']
+        const archived = (data.archivedTasks || []).map(t => Object.assign({}, t, { _archived: true }));
+        this.state.tasks = (data.tasks || []).concat(archived);
+        ['goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews']
           .forEach(k => { this.state[k] = data[k] || []; });
         this.settings = Object.assign({}, CONFIG.DEFAULTS, data.settings || {});
         this.online = true;

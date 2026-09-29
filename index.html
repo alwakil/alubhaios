@@ -6,15 +6,18 @@
   <title>PersonalOS</title>
   <meta name="description" content="PersonalOS — a personal productivity operating system: plan, execute, measure, reflect, improve.">
   <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=1.0.7">
-  <link rel="stylesheet" href="css/dashboard.css?v=1.0.7">
-  <link rel="stylesheet" href="css/fishbone.css?v=1.0.7">
-  <link rel="stylesheet" href="css/responsive.css?v=1.0.7">
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#6366f1">
+  <!-- self-hosted assets: no third-party CDN dependency -->
+  <link rel="stylesheet" href="assets/vendor/fonts/inter.css">
+  <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
+  <script src="assets/vendor/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=1.1.2">
+  <link rel="stylesheet" href="css/dashboard.css?v=1.1.2">
+  <link rel="stylesheet" href="css/fishbone.css?v=1.1.2">
+  <link rel="stylesheet" href="css/gamify.css?v=1.1.2">
+  <link rel="stylesheet" href="css/responsive.css?v=1.1.2">
 </head>
 <body>
 
@@ -66,6 +69,7 @@
       <section class="page" id="page-goals" hidden></section>
       <section class="page" id="page-routines" hidden></section>
       <section class="page" id="page-habits" hidden></section>
+      <section class="page" id="page-badges" hidden></section>
       <section class="page" id="page-focus" hidden></section>
       <section class="page" id="page-analytics" hidden></section>
       <section class="page" id="page-fishbone" hidden></section>
@@ -92,20 +96,22 @@
   <div id="modal-root"></div>
   <div id="toast-root"></div>
 
-  <script src="js/config.js?v=1.0.7"></script>
-  <script src="js/utils.js?v=1.0.7"></script>
-  <script src="js/api.js?v=1.0.7"></script>
-  <script src="js/analytics.js?v=1.0.7"></script>
-  <script src="js/dashboard.js?v=1.0.7"></script>
-  <script src="js/tasks.js?v=1.0.7"></script>
-  <script src="js/goals.js?v=1.0.7"></script>
-  <script src="js/routines.js?v=1.0.7"></script>
-  <script src="js/habits.js?v=1.0.7"></script>
-  <script src="js/fishbone.js?v=1.0.7"></script>
-  <script src="js/focus.js?v=1.0.7"></script>
-  <script src="js/reviews.js?v=1.0.7"></script>
-  <script src="js/settings.js?v=1.0.7"></script>
-  <script src="js/app.js?v=1.0.7"></script>
+  <script src="js/config.js?v=1.1.2"></script>
+  <script src="js/utils.js?v=1.1.2"></script>
+  <script src="js/api.js?v=1.1.2"></script>
+  <script src="js/analytics.js?v=1.1.2"></script>
+  <script src="js/dashboard.js?v=1.1.2"></script>
+  <script src="js/tasks.js?v=1.1.2"></script>
+  <script src="js/goals.js?v=1.1.2"></script>
+  <script src="js/routines.js?v=1.1.2"></script>
+  <script src="js/habits.js?v=1.1.2"></script>
+  <script src="js/fishbone.js?v=1.1.2"></script>
+  <script src="js/gamify.js?v=1.1.2"></script>
+  <script src="js/badges.js?v=1.1.2"></script>
+  <script src="js/focus.js?v=1.1.2"></script>
+  <script src="js/reviews.js?v=1.1.2"></script>
+  <script src="js/settings.js?v=1.1.2"></script>
+  <script src="js/app.js?v=1.1.2"></script>
   <script>
     // build the sidebar navigation (keeps HTML small, single source of truth)
     (function () {
@@ -116,6 +122,7 @@
         ['goals', 'bullseye', 'Goals'],
         ['routines', 'clock', 'Routines'],
         ['habits', 'fire', 'Habits'],
+        ['badges', 'trophy', 'Badges'],
         ['focus', 'stopwatch', 'Focus'],
         ['analytics', 'chart-line', 'Analytics'],
         ['fishbone', 'fish', 'Fishbone'],

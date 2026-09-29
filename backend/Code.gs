@@ -25,6 +25,9 @@ var SCHEMA = {
   Tasks: ['id', 'title', 'description', 'category', 'priority', 'status',
           'estimated_minutes', 'actual_minutes', 'goal_id', 'project_id',
           'scheduled_date', 'completed_at', 'created_at', 'updated_at'],
+  Archive: ['id', 'title', 'description', 'category', 'priority', 'status',
+            'estimated_minutes', 'actual_minutes', 'goal_id', 'project_id',
+            'scheduled_date', 'completed_at', 'created_at', 'updated_at'],
   Goals: ['id', 'title', 'description', 'category', 'target_date', 'progress',
           'status', 'parent_goal_id', 'created_at', 'updated_at'],
   Routines: ['id', 'title', 'description', 'category', 'target_time',
@@ -146,6 +149,7 @@ function readAction_(action, data) {
 function getAllData_() {
   return {
     tasks: list_('Tasks'),
+    archivedTasks: list_('Archive'),
     goals: list_('Goals'),
     routines: list_('Routines'),
     habits: list_('Habits'),
@@ -188,7 +192,24 @@ function writeAction_(action, data) {
         if (String(s.task_id) === String(data.id)) updateRecord_('FocusSessions', s.id, { task_id: '' });
       });
       deleteRecord_('Tasks', data.id);
+      deleteRecord_('Archive', data.id); // no-op if not archived
       return ok_('Task deleted successfully', { id: data.id });
+
+    case 'archiveOldData': {
+      var days = Number(data.days) || 120;
+      if (days < 30) throw new Error('Archive threshold must be at least 30 days.');
+      var cutoff = addDaysStr_(today_(), -days);
+      var moved = 0;
+      list_('Tasks').forEach(function (t) {
+        if (t.status !== 'completed') return;
+        var cdate = String(t.completed_at).slice(0, 10);
+        if (!cdate || cdate >= cutoff) return;
+        createRecord_('Archive', t);      // keeps the original id/timestamps
+        deleteRecord_('Tasks', t.id);
+        moved++;
+      });
+      return ok_('Archived ' + moved + ' completed task(s)', { moved: moved, cutoff: cutoff });
+    }
 
     /* ---------------- Goals ---------------- */
     case 'createGoal':
@@ -367,6 +388,7 @@ function resetAction_(type) {
   } else if (type === 'progress') {
     // deletes ALL productivity records; keeps Goals, Routines, Habits, Settings
     counts.tasks           = clearSheet_('Tasks');
+    counts.tasks          += clearSheet_('Archive');
     counts.focus_sessions  = clearSheet_('FocusSessions');
     counts.habit_logs      = clearSheet_('HabitLogs');
     counts.daily_reviews   = clearSheet_('DailyReviews');

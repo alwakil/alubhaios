@@ -19,13 +19,17 @@ const Goals = {
     const goals = App.state.goals || [];
     container.innerHTML = `
       <div class="page-head">
-        <h2>Goals</h2>
+        <div>
+          <h2>Goals</h2>
+          <button class="btn btn-sm plan-btn" data-act="plan-week" title="Auto-schedule goal tasks across the next 7 days">${icon('wand-magic-sparkles')} Plan my week</button>
+        </div>
         <button class="btn btn-primary" data-act="new">${icon('plus')} New goal</button>
       </div>
       <div id="goal-list" class="stack"></div>
     `;
     container.onclick = e => {
       if (e.target.closest('[data-act="new"]')) return this.openForm();
+      if (e.target.closest('[data-act="plan-week"]')) return this.planWeek();
       const btn = e.target.closest('[data-goal-action]');
       if (!btn) return;
       const id = btn.closest('[data-id]').dataset.id;
@@ -95,6 +99,75 @@ const Goals = {
         </div>
         ${children.map(c => this.goalCard(c, depth + 1)).join('')}
       </div>`;
+  },
+
+  /** Smart planner: re-schedule pending goal-linked tasks across the next 7 days. */
+  planWeek() {
+    const goals = App.state.goals || [];
+    const active = goals.filter(g => g.status === 'active');
+    const byId = {};
+    active.forEach(g => { byId[g.id] = g; });
+    const rank = { high: 0, medium: 1, low: 2 };
+    const candidates = (App.state.tasks || []).filter(t =>
+      t.status !== 'completed' && t.goal_id && byId[t.goal_id] &&
+      (!t.scheduled_date || t.scheduled_date < Utils.today()));
+
+    if (!candidates.length) {
+      return toast('Nothing to re-plan — create pending tasks linked to your active goals first.', 'info');
+    }
+    candidates.sort((a, b) => {
+      const da = String((byId[a.goal_id] || {}).target_date || '9999');
+      const db_ = String((byId[b.goal_id] || {}).target_date || '9999');
+      return da.localeCompare(db_) || (rank[a.priority || 'medium'] - rank[b.priority || 'medium']);
+    });
+    const picked = candidates.slice(0, 10);
+
+    // spread across the next 7 days, max 2 tasks per day
+    const load = {};
+    const plan = picked.map(t => {
+      let date = null;
+      for (let i = 1; i <= 7 && !date; i++) {
+        const d = Utils.addDays(Utils.today(), i);
+        if ((load[d] || 0) < 2) { date = d; load[d] = (load[d] || 0) + 1; }
+      }
+      return { task: t, date: date };
+    });
+
+    const m = openModal({
+      title: icon('wand-magic-sparkles') + ' Plan my week',
+      wide: true,
+      body: `
+        <p class="muted small">${plan.length} pending goal task(s) sorted by goal deadline and priority — scheduled over the next 7 days (max 2/day). Overdue and unscheduled tasks only; nothing else is touched.</p>
+        <div class="plan-list">
+          ${plan.map(p => `
+            <div class="plan-row">
+              <span class="plan-date">${Utils.fmtDay(p.date).slice(0, 3)} ${Utils.fmtDate(p.date).slice(0, 6)}</span>
+              <span class="plan-title">${Utils.esc(p.task.title)}</span>
+              <span class="muted small">🎯 ${Utils.esc((byId[p.task.goal_id] || {}).title || '')}</span>
+            </div>`).join('')}
+        </div>`,
+      footer: `
+        <button class="btn btn-ghost" data-cancel>Cancel</button>
+        <button class="btn btn-primary" data-apply>${icon('calendar-check')} Schedule ${plan.length} tasks</button>`
+    });
+
+    qs('[data-cancel]', m.overlay).addEventListener('click', m.close);
+    qs('[data-apply]', m.overlay).addEventListener('click', async btn => {
+      const applyBtn = qs('[data-apply]', m.overlay);
+      applyBtn.disabled = true;
+      let done = 0;
+      for (const p of plan) {
+        applyBtn.innerHTML = `${icon('spinner', 'fa-spin')} Scheduling ${done + 1}/${plan.length}…`;
+        try {
+          const rec = await API.updateTask(p.task.id, { scheduled_date: p.date });
+          App.replaceRecord('tasks', rec);
+          done++;
+        } catch (e) { App.handleError(e); break; }
+      }
+      m.close();
+      App.refreshCurrent();
+      toast(done === plan.length ? `✅ ${done} tasks scheduled across your week!` : `Scheduled ${done}/${plan.length} — some failed, try again.`, done ? 'success' : 'error');
+    });
   },
 
   async syncProgress(goal) {

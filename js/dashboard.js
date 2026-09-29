@@ -39,6 +39,14 @@ const Dashboard = {
             <div><span class="sb-label">Habits</span><span class="sb-val">${Math.round(t.habitTotal ? t.habitDone / t.habitTotal * 20 : 0)}/20</span></div>
             <div><span class="sb-label">Distraction</span><span class="sb-val">-${Math.min(10, Math.round(t.distractionMinutes / 6))}</span></div>
           </div>
+          ${(() => {
+            const lv = Gamify.level(Gamify.xp());
+            return `<a class="level-mini" href="#/badges" title="Open Badges">
+              <span class="level-badge">Lv ${lv.level}</span>
+              <div class="level-mini-bar"><div class="progress-fill" style="width:${lv.pct}%"></div></div>
+              <span class="muted small">${lv.into}/${lv.need} XP</span>
+            </a>`;
+          })()}
         </div>
 
         <div class="stat-grid">

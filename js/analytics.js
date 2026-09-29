@@ -33,6 +33,8 @@ const Analytics = {
     const logs = (App.state.habitLogs || []).filter(l =>
       String(l.date).slice(0, 10) === date &&
       (l.completed === true || l.completed === 'TRUE' || String(l.completed).toLowerCase() === 'true'));
+    // freeze check-ins keep streaks alive but don't count as real completions
+    const realLogs = logs.filter(l => !/❄|freeze/i.test(String(l.note || '')));
 
     const tasksToday = (App.state.tasks || []).filter(t => t.scheduled_date === date);
     const doneToday = (App.state.tasks || []).filter(t => this.taskCompletedDate(t) === date);
@@ -49,7 +51,7 @@ const Analytics = {
     });
     const plannedMin = tasksToday.reduce((a, t) => a + Utils.num(t.estimated_minutes), 0);
 
-    const habitDone = logs.filter(l => habitIds.indexOf(l.habit_id) !== -1).length;
+    const habitDone = realLogs.filter(l => habitIds.indexOf(l.habit_id) !== -1).length;
     const habitTotal = enabledHabits.length;
 
     const score = this.scoreDay({
@@ -405,6 +407,20 @@ const AnalyticsPage = {
         </div>
       </div>
 
+      <div class="card chart-card year-card">
+        <h3 class="card-title">${icon('calendar-days')} Productivity heatmap — last 12 months</h3>
+        <div class="year-heatmap-wrap">
+          <div class="year-months" id="year-months"></div>
+          <div class="year-heatmap" id="year-heatmap"></div>
+        </div>
+        <div class="heatmap-legend muted small">
+          <span>Lower</span>
+          <span class="lg lg0"></span><span class="lg lg1"></span><span class="lg lg2"></span><span class="lg lg3"></span><span class="lg lg4"></span>
+          <span>Higher</span>
+          <span class="muted">· daily productivity score</span>
+        </div>
+      </div>
+
       <div class="analytics-grid">
         <div class="card chart-card">
           <h3 class="card-title">Daily productivity — last ${r} days</h3>
@@ -457,6 +473,47 @@ const AnalyticsPage = {
     this.plannedActualChart('an-planned-actual', daily);
     Dashboard.focusDistractionChart('an-focus-distraction', daily);
     this.planningCard();
+    this.yearHeatmap();
+  },
+
+  /** GitHub-style 365-day heatmap of the daily productivity score. */
+  yearHeatmap() {
+    const daily = Analytics.dailyStats(365);
+    const grid = qs('#year-heatmap');
+    const months = qs('#year-months');
+    if (!grid) return;
+    if (!daily.some(d => d.active)) {
+      grid.innerHTML = `<p class="muted small" style="grid-column:1/-1;padding:10px 0">No data yet — your year fills in as you track.</p>`;
+      if (months) months.innerHTML = '';
+      return;
+    }
+    const today = Utils.today();
+    const start = daily[0].date;
+    const lead = (Utils.parseDate(start).getDay() + 6) % 7; // Monday-based padding
+    const byDate = {};
+    daily.forEach(d => { byDate[d.date] = d; });
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const columns = Math.ceil((lead + daily.length) / 7);
+    let cells = '';
+    for (let i = 0; i < lead; i++) cells += '<span class="yh-cell empty"></span>';
+    daily.forEach(d => {
+      const score = d.score;
+      const bucket = !d.active ? 0 : score < 25 ? 1 : score < 50 ? 2 : score < 75 ? 3 : 4;
+      cells += `<span class="yh-cell lg${bucket} ${d.date === today ? 'today' : ''}" title="${Utils.fmtDate(d.date)} — score ${score}${d.active ? '' : ' (no activity)'}"></span>`;
+    });
+
+    let labels = '';
+    let prevMonth = '';
+    for (let c = 0; c < columns; c++) {
+      const idx = c * 7 - lead;
+      const d = (idx >= 0 && idx < daily.length) ? daily[idx] : null;
+      const m = d ? d.date.slice(5, 7) : '';
+      labels += (d && m !== prevMonth) ? `<span class="yh-month">${names[Number(m) - 1]}</span>` : '<span class="yh-month"></span>';
+      if (d) prevMonth = m;
+    }
+    grid.innerHTML = cells;
+    if (months) months.innerHTML = labels;
   },
 
   productivityChart(canvasId, daily, r) {

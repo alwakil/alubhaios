@@ -1,0 +1,8 @@
+/* Inter variable font — self-hosted (latin subset, weights 100-900) */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('inter-var-latin.woff2') format('woff2');
+}

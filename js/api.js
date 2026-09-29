@@ -122,5 +122,6 @@ const API = {
 
   /* -------- settings / reset -------- */
   saveSettings(settingsObj) { return this.call('saveSettings', { settings: settingsObj }); },
+  archiveOldData(days) { return this.call('archiveOldData', { days: days }); },
   reset(type) { return this.call('reset', { type: type }); }
 };

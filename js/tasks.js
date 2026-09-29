@@ -5,14 +5,19 @@
 
 const Tasks = {
   filter: { status: '', category: '', priority: '', goal: '', date: '', search: '' },
+  showArchived: false,
 
   page(container) {
     const f = this.filter;
     const goals = App.state.goals || [];
+    const archivedCount = (App.state.tasks || []).filter(t => t._archived).length;
     container.innerHTML = `
       <div class="page-head">
         <h2>Tasks</h2>
-        <button class="btn btn-primary" data-act="new">${icon('plus')} New task</button>
+        <div class="tasks-head-actions">
+          ${archivedCount ? `<button class="btn btn-sm ${this.showArchived ? 'btn-primary' : ''}" data-act="toggle-archived" title="Show/hide archived tasks">${icon('box-archive')} Archived (${archivedCount})</button>` : ''}
+          <button class="btn btn-primary" data-act="new">${icon('plus')} New task</button>
+        </div>
       </div>
 
       <div class="card filter-bar">
@@ -53,6 +58,7 @@ const Tasks = {
     });
     container.onclick = e => {
       if (e.target.closest('[data-act="new"]')) return this.openForm();
+      if (e.target.closest('[data-act="toggle-archived"]')) { this.showArchived = !this.showArchived; return this.page(container); }
       if (e.target.closest('[data-act="clear-filters"]')) {
         this.filter = { status: '', category: '', priority: '', goal: '', date: '', search: '' };
         return this.page(container);
@@ -78,6 +84,7 @@ const Tasks = {
   filtered() {
     const f = this.filter, today = Utils.today(), weekStart = Utils.startOfWeek(today);
     return (App.state.tasks || []).filter(t => {
+      if (this.showArchived ? !t._archived : t._archived) return false;
       if (f.status && t.status !== f.status) return false;
       if (f.category && t.category !== f.category) return false;
       if (f.priority && t.priority !== f.priority) return false;
@@ -119,6 +126,23 @@ const Tasks = {
     const goal = (App.state.goals || []).find(g => g.id === t.goal_id);
     const overdue = t.scheduled_date && t.scheduled_date < Utils.today() && t.status !== 'completed';
     const done = t.status === 'completed';
+    if (t._archived) {
+      return `
+      <div class="task-card card is-done" data-id="${t.id}">
+        <button class="task-check checked" disabled>${icon('check')}</button>
+        <div class="task-main">
+          <div class="task-title">${Utils.esc(t.title)}</div>
+          <div class="task-meta">
+            ${chip('🗄 archived', '#64748b')}
+            ${t.category ? chip(t.category, Utils.categoryColor(t.category)) : ''}
+            ${t.completed_at ? chip('done ' + Utils.fmtDate(String(t.completed_at).slice(0, 10)), '#10b981') : ''}
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="btn btn-icon btn-ghost danger" data-task-action="delete" title="Delete forever">${icon('trash')}</button>
+        </div>
+      </div>`;
+    }
     return `
       <div class="task-card card ${done ? 'is-done' : ''}" data-id="${t.id}">
         <button class="task-check ${done ? 'checked' : ''}" data-task-action="toggle" title="${done ? 'Undo completion' : 'Mark complete'}">

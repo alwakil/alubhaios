@@ -1,0 +1,237 @@
+/* ============================================================
+   PersonalOS — Gamification, badges, heatmap, reports, extras
+   ============================================================ */
+
+/* ---------- Level / XP (dashboard mini + badges page) ---------- */
+
+.level-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--c-primary-soft);
+  color: var(--text);
+}
+.level-mini:hover { filter: brightness(1.06); }
+.level-badge {
+  flex: none;
+  font-weight: 800;
+  font-size: 12px;
+  color: #fff;
+  background: var(--c-primary);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.level-mini-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.level-mini .progress-fill { background: var(--c-primary); }
+.level-mini .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.level-card { margin-bottom: 14px; }
+.level-row { display: flex; align-items: center; gap: 16px; }
+.level-num {
+  flex: none;
+  width: 58px; height: 58px;
+  border-radius: 16px;
+  background: var(--c-primary);
+  color: #fff;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  line-height: 1.1;
+}
+.level-num b { font-size: 20px; }
+.level-bar-wrap { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.level-line { font-weight: 700; font-size: 12.5px; }
+.level-card .progress-fill { background: var(--c-primary); }
+.xp-legend { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+
+/* ---------- Badges grid ---------- */
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+.badge-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+.badge-card.unlocked { border-color: color-mix(in srgb, var(--tier) 55%, var(--border)); }
+.badge-card.locked { opacity: .68; }
+.badge-icon {
+  flex: none;
+  width: 46px; height: 46px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  background: color-mix(in srgb, var(--tier) 16%, transparent);
+  color: var(--tier);
+}
+.badge-card.locked .badge-icon { background: var(--bg-hover); color: var(--text-muted); }
+.badge-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.badge-body b { font-size: 13px; }
+.badge-body .progress-bar { height: 5px; }
+.badge-progress { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.badge-card.unlocked .badge-progress { color: var(--c-success); }
+.badge-tier { flex: none; font-size: 13px; color: var(--tier); opacity: .9; }
+
+/* ---------- Streak freeze ---------- */
+
+.freeze-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #60a5fa 9%, transparent);
+  border: 1px dashed color-mix(in srgb, #60a5fa 45%, transparent);
+}
+.freeze-btn { border-color: #60a5fa; color: #60a5fa; }
+.freeze-btn:hover { background: #60a5fa; color: #fff; }
+
+/* ---------- Pomodoro ---------- */
+
+.pomo-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  font-size: 12px;
+  padding: 6px 16px;
+  border-radius: 999px;
+}
+.pomo-phase.focus { background: var(--c-primary-soft); color: var(--c-primary); }
+.pomo-phase.break { background: rgba(16, 185, 129, .14); color: var(--c-success); }
+
+/* ---------- Weekly report ---------- */
+
+.wr-report { margin-bottom: 14px; }
+.wr-report-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.wr-delta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.wr-delta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-hover);
+}
+.wr-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.wr-delta b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.wr-diff { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.wr-delta.tone-good .wr-diff { color: var(--c-success); }
+.wr-delta.tone-bad .wr-diff { color: var(--c-danger); }
+.wr-delta.tone-muted .wr-diff { color: var(--text-muted); }
+.wr-days { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* ---------- Year heatmap ---------- */
+
+.year-card { grid-column: 1 / -1; }
+.year-heatmap-wrap { overflow-x: auto; padding-bottom: 4px; }
+.year-months {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 14px;
+  gap: 3px;
+  margin-left: 0;
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.yh-month { overflow: visible; white-space: nowrap; height: 12px; }
+.year-heatmap {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 13px);
+  grid-auto-columns: 13px;
+  gap: 3px;
+}
+.yh-cell { border-radius: 3px; background: var(--bg-hover); }
+.yh-cell.empty { visibility: hidden; }
+.yh-cell.lg1 { background: color-mix(in srgb, #10b981 25%, var(--bg-hover)); }
+.yh-cell.lg2 { background: color-mix(in srgb, #10b981 50%, var(--bg-hover)); }
+.yh-cell.lg3 { background: color-mix(in srgb, #10b981 75%, transparent); }
+.yh-cell.lg4 { background: #10b981; }
+.yh-cell.today { outline: 1.5px solid var(--c-primary); }
+.heatmap-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; }
+.heatmap-legend .lg { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.heatmap-legend .lg0 { background: var(--bg-hover); }
+.heatmap-legend .lg1 { background: color-mix(in srgb, #10b981 25%, var(--bg-hover)); }
+.heatmap-legend .lg2 { background: color-mix(in srgb, #10b981 50%, var(--bg-hover)); }
+.heatmap-legend .lg3 { background: color-mix(in srgb, #10b981 75%, transparent); }
+.heatmap-legend .lg4 { background: #10b981; }
+
+/* ---------- Planner modal ---------- */
+
+.plan-list { display: flex; flex-direction: column; gap: 6px; max-height: 45vh; overflow-y: auto; margin-top: 8px; }
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  font-size: 13px;
+}
+.plan-date {
+  flex: none;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--c-primary);
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+.plan-title { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+
+/* ---------- Shortcuts help ---------- */
+
+.shortcut-grid { display: flex; flex-direction: column; gap: 8px; }
+.shortcut-grid > div { display: flex; align-items: center; gap: 12px; }
+.shortcut-grid kbd {
+  flex: none;
+  min-width: 64px;
+  text-align: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2.5px;
+  background: var(--bg);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ---------- Tasks header actions ---------- */
+
+.tasks-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Print (weekly report) ---------- */
+@media print {
+  #sidebar, #topbar, #bottom-nav, #toast-root, #loading-overlay,
+  .page-head, .week-nav, .tabs, .form-actions, #global-error, #setup-banner { display: none !important; }
+  #main { margin: 0; }
+  body { background: #fff; color: #000; }
+  .card { border-color: #ddd; box-shadow: none; }
+}
+
+@media (max-width: 768px) {
+  .wr-delta-grid { grid-template-columns: 1fr 1fr; }
+  .level-row { flex-direction: column; align-items: stretch; }
+  .level-num { align-self: center; }
+}

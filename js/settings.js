@@ -56,12 +56,21 @@ const Settings = {
           <p class="muted small">Full setup guide: see the repository README (Google Sheet → Apps Script → deploy Web App).</p>
         </div>
 
+        <!-- Notifications -->
+        <div class="card">
+          <h3 class="card-title">${icon('bell')} Notifications</h3>
+          <p class="muted small" id="notif-status">Status: <b>${('Notification' in window) ? Notification.permission : 'unsupported'}</b> — routine reminders + pomodoro alerts.</p>
+          <p class="muted small">Reminders fire while the app is open (a pinned tab works great).</p>
+          <button class="btn" id="notif-enable">${icon('bell')} Enable notifications</button>
+        </div>
+
         <!-- About -->
         <div class="card">
           <h3 class="card-title">${icon('circle-info')} About</h3>
           <p class="small">${Utils.esc(CONFIG.APP_NAME)} v${Utils.esc(CONFIG.VERSION)} — a personal productivity operating system:
             Plan → Execute → Measure → Reflect → Improve.</p>
           <p class="muted small">Frontend: GitHub Pages · Backend: Google Apps Script · Database: Google Sheets · Charts: Chart.js</p>
+          <p class="muted small" id="pwa-hint"></p>
         </div>
       </div>
 
@@ -93,9 +102,20 @@ const Settings = {
         <div class="danger-row last">
           <div>
             <b>Reset Everything</b>
-            <p class="muted small">Wipes the complete database — every sheet including goals, routines, habits AND settings. Only use when you want a truly blank slate.</p>
+            <p class="muted small">Wipes the complete database — every sheet including settings. Only use when you want a truly blank slate.</p>
           </div>
           <button class="btn btn-danger" id="reset-everything">Reset everything</button>
+        </div>
+        <div class="danger-row last" style="border-top:1px solid var(--border)">
+          <div>
+            <b>${icon('box-archive')} Archive old tasks</b>
+            <p class="muted small">Moves completed tasks older than the threshold into an "Archive" sheet in your spreadsheet. Nothing is deleted — history and stats stay intact.</p>
+            <div class="field-row" style="max-width:260px;margin-top:8px">
+              <label class="field"><span>Older than (days)</span>
+                <input type="number" id="archive-days" min="30" step="10" value="120"></label>
+            </div>
+          </div>
+          <button class="btn" id="archive-run">${icon('box-archive')} Archive now</button>
         </div>
       </div>
     `;
@@ -145,6 +165,43 @@ const Settings = {
           btn.innerHTML = `${icon('satellite-dish')} Test connection`;
           App.refreshCurrent();
         });
+    });
+
+    /* --- notifications --- */
+    qs('#notif-enable', container).addEventListener('click', async () => {
+      const ok = await askNotifyPermission();
+      if (ok) toast('Notifications enabled 🔔', 'success');
+      const st = qs('#notif-status', container);
+      if (st && 'Notification' in window) st.innerHTML = `Status: <b>${Notification.permission}</b> — routine reminders + pomodoro alerts.`;
+    });
+
+    // PWA install hint
+    const pwa = qs('#pwa-hint', container);
+    if (pwa) {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches;
+      pwa.innerHTML = standalone
+        ? `${icon('mobile-screen')} Running as an installed app. Enjoy! 🎉`
+        : `${icon('mobile-screen')} Install tip: browser menu → "Install PersonalOS" / "Add to Home screen" for the full-screen app experience.`;
+    }
+
+    /* --- archive --- */
+    qs('#archive-run', container).addEventListener('click', async () => {
+      const days = Utils.num(qs('#archive-days', container).value) || 120;
+      const ok = await confirmDialog({
+        title: 'Archive old tasks?',
+        message: `Completed tasks finished more than <b>${days} days</b> ago will move to the "Archive" sheet in your spreadsheet. They stay available to stats and can be viewed under Tasks → Archived.`,
+        confirmText: 'Archive now',
+        danger: false
+      });
+      if (!ok) return;
+      toast('Archiving…', 'info');
+      API.archiveOldData(days)
+        .then(res => {
+          const n = (res && res.moved) || 0;
+          toast(n ? `🗄 ${n} task(s) archived.` : 'Nothing to archive — everything is recent.', 'success');
+          App.reload();
+        })
+        .catch(e => App.handleError(e));
     });
 
     /* --- resets --- */

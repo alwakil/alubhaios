@@ -22,6 +22,8 @@ const Reviews = {
     container.onclick = e => {
       const tab = e.target.closest('.tab');
       if (tab) { this.tab = tab.dataset.tab; return this.page(container); }
+      const printBtn = e.target.closest('#wr-print');
+      if (printBtn) { window.print(); return; }
       this.handleAction(e);
     };
     if (this.tab === 'daily') this.renderDaily(qs('#review-body', container));
@@ -197,15 +199,44 @@ const Reviews = {
     const weekStart = Utils.addDays(Utils.startOfWeek(Utils.today()), this.weekOffset * 7);
     const weekEnd = Utils.addDays(weekStart, 6);
 
-    // aggregate the 7 days
+    // aggregate the 7 days of the selected week
     const days = [];
     for (let i = 0; i < 7; i++) days.push(Analytics.dayStat(Utils.addDays(weekStart, i)));
+
+    const existing = (App.state.weeklyReviews || []).find(r => String(r.week_start).slice(0, 10) === weekStart);
+
+    // ---- auto weekly report (this week vs previous week, from real data) ----
     const sum = k => days.reduce((a, d) => a + d[k], 0);
     const activeDays = days.filter(d => d.active);
     const avgScore = activeDays.length ? Math.round(activeDays.reduce((a, d) => a + d.score, 0) / activeDays.length) : 0;
     const habitPct = Math.round(sum('habitDone') / Math.max(1, sum('habitTotal')) * 100);
 
-    const existing = (App.state.weeklyReviews || []).find(r => String(r.week_start).slice(0, 10) === weekStart);
+    const prevDays = [];
+    for (let i = 0; i < 7; i++) prevDays.push(Analytics.dayStat(Utils.addDays(weekStart, -7 + i)));
+    const pSum = k => prevDays.reduce((a, d) => a + d[k], 0);
+    const pActive = prevDays.filter(d => d.active);
+    const pAvgScore = pActive.length ? Math.round(pActive.reduce((a, d) => a + d.score, 0) / pActive.length) : 0;
+    const pHabitPct = Math.round(pSum('habitDone') / Math.max(1, pSum('habitTotal')) * 100);
+
+    const delta = (cur, prev) => {
+      if (!prev) return null;
+      const d = cur - prev;
+      return { d, pct: prev ? Math.round(d / prev * 100) : null };
+    };
+    const deltaChip = (label, cur, prev, fmt, lowerIsBetter) => {
+      const dl = delta(cur, prev);
+      const arrow = dl === null ? '' : dl.d > 0 ? icon('arrow-trend-up') : dl.d < 0 ? icon('arrow-trend-down') : icon('minus');
+      const tone = dl === null || dl.d === 0 ? 'muted' : ((dl.d > 0) !== !!lowerIsBetter ? 'good' : 'bad');
+      return `<div class="wr-delta tone-${tone}">
+        <span class="wr-label">${label}</span>
+        <b>${fmt(cur)}</b>
+        ${dl === null ? '<span class="muted small">no last-week data</span>'
+          : `<span class="wr-diff">${arrow} ${dl.d > 0 ? '+' : ''}${fmt(dl.d)}${dl.pct !== null ? ` (${Math.abs(dl.pct)}%)` : ''}</span>`}
+      </div>`;
+    };
+    const bestDay = activeDays.length ? activeDays.reduce((a, d) => d.score > a.score ? d : a) : null;
+    const worstDay = activeDays.length ? activeDays.reduce((a, d) => d.score < a.score ? d : a) : null;
+    const hasAny = days.some(d => d.active) || prevDays.some(d => d.active);
 
     container.innerHTML = `
       <div class="week-nav card">
@@ -216,6 +247,24 @@ const Reviews = {
         </div>
         <button class="btn btn-icon btn-ghost" data-week="1" title="Next week" ${this.weekOffset >= 0 ? 'disabled' : ''}>${icon('chevron-right')}</button>
       </div>
+
+      ${hasAny ? `
+      <div class="card wr-report">
+        <div class="wr-report-head">
+          <h3 class="card-title">${icon('chart-line')} Auto weekly report</h3>
+          <button class="btn btn-sm" id="wr-print">${icon('print')} Print</button>
+        </div>
+        <div class="wr-delta-grid">
+          ${deltaChip('Avg productivity', avgScore, pAvgScore, v => v)}
+          ${deltaChip('Focus time', sum('focusMinutes'), pSum('focusMinutes'), v => Utils.fmtMinutes(v))}
+          ${deltaChip('Tasks completed', sum('tasksCompleted'), pSum('tasksCompleted'), v => v)}
+          ${deltaChip('Habit consistency', habitPct, pHabitPct, v => v + '%')}
+        </div>
+        ${bestDay ? `<div class="wr-days">
+          <span class="chip" style="--chip-c:#10b981">${icon('trophy')} Best day: <b>&nbsp;${Utils.fmtDay(bestDay.date)}</b> (${bestDay.score}/100)</span>
+          ${worstDay && worstDay.date !== bestDay.date ? `<span class="chip" style="--chip-c:#64748b">${icon('cloud-rain')} Toughest day: <b>&nbsp;${Utils.fmtDay(worstDay.date)}</b> (${worstDay.score}/100)</span>` : ''}
+        </div>` : ''}
+      </div>` : ''}
 
       <div class="reviews-grid">
         <div class="card">

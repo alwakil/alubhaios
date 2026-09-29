@@ -33,19 +33,20 @@ A complete, single-user productivity app built on **HTML/CSS/vanilla JavaScript 
 
 ## Features
 
-- **Dashboard** — daily productivity score (0–100), 8 stat tiles, smart insights, 3 live charts.
+- **Installable PWA** — install from the browser menu ("Install PersonalOS" / "Add to Home screen"); works full-screen on phone and desktop, static files cached offline.
+- **Dashboard** — daily productivity score (0–100), 8 stat tiles, XP/Level progress, smart insights, 3 live charts.
 - **Today** — morning plan (top 3 priorities, today's routine timeline, connected goals), today's tasks with complete/undo/edit/delete/focus/priority-cycle, habit quick check, live day summary.
-- **Tasks** — full CRUD, filters (status / category / priority / goal / date / search), overdue detection, estimated vs actual minutes, optional project tag and goal link.
-- **Goals** — hierarchy (long-term → 90-day → monthly → …) via parent goals, visual progress bars, auto progress from linked tasks, "add sub-goal / add task" shortcuts.
-- **Routines** — time-based schedule builder with per-weekday recurrence (`Every day` supported), enable/disable, duration.
-- **Habits** — streaks (current/best) recomputed from logs (editing never breaks history), 30-day completion %, GitHub-style 10-week heatmap, one-tap check-in.
-- **Focus timer** — Deep Work / Study / CTF / Project / Quick Task modes, start–pause–resume–stop, survives page reloads, end-of-session dialog ("How focused were you? 1–5", interruptions, notes), distraction categories tracked separately.
-- **Analytics** — 8 Chart.js graphs (productivity 7D/30D/90D, focus time, task completion, habit consistency, weekly trend, category distribution, planned vs actual, focus vs distraction) + planning-accuracy card.
+- **Tasks** — full CRUD, filters (status / category / priority / goal / date / search), overdue detection, estimated vs actual minutes, optional project tag and goal link, **archive view** for old tasks.
+- **Goals** — hierarchy (long-term → 90-day → monthly → …) via parent goals, visual progress bars, auto progress from linked tasks, and a **"Plan my week"** assistant that re-schedules pending goal tasks across the next 7 days (deadline + priority aware, max 2/day).
+- **Routines** — time-based schedule builder with per-weekday recurrence (`Every day` supported), enable/disable, duration, **browser notifications when a routine starts**.
+- **Habits** — streaks (current/best) recomputed from logs (editing never breaks history), 30-day completion %, GitHub-style 10-week heatmap, one-tap check-in, **streak freezes** (earned via 7-day milestones, spent to save a streak).
+- **Focus timer** — **Stopwatch and Pomodoro modes**: Deep Work / Study / CTF / Project / Quick Task presets, 25/5 cycles with countdown, notification + beep on rollover, auto-saved sessions, survives page reloads, end-of-session dialog ("How focused were you? 1–5", interruptions, notes), distraction categories tracked separately.
+- **Badges** — 23 achievements in bronze/silver/gold tiers, unlocked from real progress (tasks, focus hours, streaks, reviews, goals, pomodoros, XP level) with live progress bars.
+- **Analytics** — 8 Chart.js graphs (productivity 7D/30D/90D, focus time, task completion, habit consistency, weekly trend, category distribution, planned vs actual, focus vs distraction), **365-day productivity heatmap**, planning-accuracy card.
 - **Smart insights** — generated from your real data ("Task completion dropped 12% compared with last week", "You tend to complete more tasks on Tuesdays", "Entertainment accounted for 18% of tracked time this week", "You usually underestimate tasks by approximately 25%"). With no data it simply says *"Not enough data yet."*
-- **Reviews** — daily review (energy/focus/motivation/stress + accomplishment/blocker/notes) with auto day summary; weekly review (auto-computed weekly report + biggest win/problem/next week's focus).
-- **Settings** — profile, daily focus goal, dark/light theme, backend URL override + connection test, and the guarded **Data Management / Reset** system.
-- **Global search** — `Ctrl+K` or `/` searches tasks, goals, routines, habits and projects.
-- **Data safety** — every delete confirms; full resets require typing `RESET`; settings survive "Reset All Progress".
+- **Reviews** — daily review (energy/focus/motivation/stress + accomplishment/blocker/notes) with auto day summary; weekly review with an **auto weekly report** (this week vs last week deltas, best/toughest day) that is printable.
+- **Keyboard shortcuts** — `N` new task, `F` focus, `T` today, `D` dashboard, `A` analytics, `G` goals, `B` badges, `/` search, `?` help.
+- **Data safety** — every delete confirms; full resets require typing `RESET`; settings survive "Reset All Progress"; **archive** moves old completed tasks to an Archive sheet (nothing deleted).
 
 ---
 
@@ -92,6 +93,11 @@ A complete, single-user productivity app built on **HTML/CSS/vanilla JavaScript 
    `https://script.google.com/macros/s/AKfycb…/exec`
 
 > **After any later change to `Code.gs`:** Deploy → Manage deployments → ✏ Edit → Version: **New version** → Deploy. The URL stays the same.
+> Also re-run **`setupSheets`** once after updating `Code.gs` — it creates the newer sheets (e.g. `Archive`) automatically.
+
+### Update to v1.1.0 (PWA / Archive / Badges release)
+
+If your backend was deployed before v1.1.0: paste the current `backend/Code.gs` into the Apps Script editor, run **`setupSheets`** once (creates the `Archive` sheet), then re-deploy a **new version**. The frontend updates itself on hard refresh.
 
 ---
 

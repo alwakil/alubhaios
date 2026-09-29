@@ -15,6 +15,8 @@ const Habits = {
     `;
     container.onclick = e => {
       if (e.target.closest('[data-act="new"]')) return this.openForm();
+      const freezeBtn = e.target.closest('[data-habit-freeze]');
+      if (freezeBtn) return this.useFreeze(freezeBtn.dataset.habitFreeze);
       const toggle = e.target.closest('[data-habit-toggle]');
       if (toggle) return this.toggleToday(toggle.dataset.habitToggle);
       const btn = e.target.closest('[data-habit-action]');
@@ -48,6 +50,7 @@ const Habits = {
       const st = Analytics.habitStreaks(h.id);
       const pct30 = Analytics.habitPctDays(h.id, 30);
       const doneToday = Analytics.habitDates(h.id).has(Utils.today());
+      const canFreeze = !doneToday && st.current > 0 && Gamify.heldFreezes() > 0;
       return `
       <div class="card habit-card ${h.enabled === false ? 'is-disabled' : ''}" data-id="${h.id}">
         <div class="habit-head">
@@ -71,6 +74,11 @@ const Habits = {
             ${icon(doneToday ? 'check' : 'plus')} ${doneToday ? 'Done today' : 'Mark done'}
           </button>
         </div>
+        ${canFreeze ? `
+        <div class="freeze-row">
+          <span class="muted small">${icon('snowflake')} Streak at risk? Use a freeze (you have ${Gamify.heldFreezes()}) to keep it alive.</span>
+          <button class="btn btn-sm freeze-btn" data-habit-freeze="${h.id}">${icon('snowflake')} Use freeze</button>
+        </div>` : ''}
         <div class="heatmap-wrap">
           <div class="heatmap-label muted small">Last 10 weeks</div>
           <div class="heatmap">${this.heatmap(h.id)}</div>
@@ -112,8 +120,22 @@ const Habits = {
       }
       if (res && res.habit) App.replaceRecord('habits', res.habit);
       App.refreshCurrent();
+      if (!done) Gamify.checkFreezeAward(); // 7-day streak milestones earn a freeze
       toast(!done ? `${h.title} — done! 🔥` : `${h.title} marked as not done`, 'success');
     } catch (e) { App.handleError(e); }
+  },
+
+  async useFreeze(habitId) {
+    const h = (App.state.habits || []).find(x => x.id === habitId);
+    if (!h) return;
+    const ok = await confirmDialog({
+      title: 'Use a streak freeze?',
+      message: `One freeze (❄️) will be spent to keep "<b>${Utils.esc(h.title)}</b>"'s ${Analytics.habitStreaks(habitId).current}-day streak alive. You hold ${Gamify.heldFreezes()} freeze(s).`,
+      confirmText: 'Use freeze',
+      danger: false
+    });
+    if (!ok) return;
+    if (await Gamify.useFreeze(habitId)) App.refreshCurrent();
   },
 
   async remove(h) {

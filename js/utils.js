@@ -281,6 +281,45 @@ function typeConfirm(opts) {
   });
 }
 
+/* ---------------- Notifications + sound ---------------- */
+
+/** Ask once for browser-notification permission. Resolves true if granted. */
+async function askNotifyPermission() {
+  if (!('Notification' in window)) { toast('This browser does not support notifications.', 'warn'); return false; }
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') { toast('Notifications are blocked in browser settings.', 'warn'); return false; }
+  const p = await Notification.requestPermission();
+  if (p !== 'granted') { toast('Notification permission was not granted.', 'warn'); return false; }
+  return true;
+}
+
+/** Fire a browser notification (silently no-op without permission). */
+function notify(title, body) {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    new Notification(title, { body: body || '', icon: 'assets/icons/icon-192.png', badge: 'assets/icons/icon-192.png', tag: 'personalos-' + Date.now() });
+  } catch (e) { /* ignore */ }
+}
+
+/** Short pleasant beep through WebAudio (no audio files needed). */
+function beep(times) {
+  times = times || 2;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    for (let i = 0; i < times; i++) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = 880;
+      o.connect(g); g.connect(ctx.destination);
+      const t0 = ctx.currentTime + i * 0.35;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28);
+      o.start(t0); o.stop(t0 + 0.3);
+    }
+    setTimeout(() => { try { ctx.close(); } catch (e) { /* ignore */ } }, times * 350 + 600);
+  } catch (e) { /* ignore */ }
+}
+
 // resolve promise when any modal is dismissed so confirmDialog never hangs
 document.addEventListener('DOMContentLoaded', () => {
   const root = qs('#modal-root');
