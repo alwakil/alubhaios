@@ -2,10 +2,28 @@
    PersonalOS — Fishbone diagram styles + animations
    ============================================================ */
 
-.fb-card { padding: 10px; }
-.fb-scroll { overflow-x: auto; border-radius: 12px; background: var(--bg); }
-.fb-svg { display: block; min-width: 100%; }
-.fb-scroll-hint { padding: 8px 10px 2px; display: none; }
+/* the fishbone page gets a wider canvas than other pages */
+#pages:has(#page-fishbone:not([hidden])) { max-width: 1600px; }
+
+.fb-card { padding: 10px 10px 6px; }
+
+.fb-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px 8px;
+}
+
+/* FIT mode (default): the whole diagram scales to the card width */
+.fb-card.fit .fb-scroll { overflow-x: hidden; }
+.fb-card.fit .fb-svg { width: 100%; height: auto; }
+
+/* FULL mode: 1:1 size with horizontal scrolling */
+.fb-card.full .fb-scroll { overflow-x: auto; border-radius: 12px; background: var(--bg); }
+.fb-card.full .fb-svg { width: 1500px; height: 810px; min-width: 1500px; }
+
+.fb-svg { display: block; background: var(--bg); border-radius: 12px; }
 
 .fb-head-stats { display: flex; gap: 8px; flex-wrap: wrap; }
 .fb-head-stats .chip b { margin: 0 2px; }
@@ -146,9 +164,9 @@
 
 /* ---------- small screens ---------- */
 @media (max-width: 900px) {
-  .fb-scroll-hint { display: block; }
   .fb-below { grid-template-columns: 1fr; }
   .fb-head-stats { margin-top: 8px; }
+  .fb-toolbar { flex-wrap: wrap; }
 }
 
 /* ---------- respect reduced motion ---------- */

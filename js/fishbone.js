@@ -105,6 +105,12 @@ const Fishbone = {
 
   causeId(catIdx, i) { return 'fb' + catIdx + '-' + i; },
 
+  /** fit-to-width (whole diagram always visible) vs 1:1 scrollable — user toggle */
+  getFit() {
+    const v = Utils.pref('fbFit');
+    return v === null || v === undefined ? true : v !== false;
+  },
+
   /** solved = manual set (Settings) ∪ causes with a completed [fb:id] task */
   solvedSet() {
     const set = new Set();
@@ -122,6 +128,7 @@ const Fishbone = {
     const D = FISHBONE_DATA;
     const solved = this.solvedSet();
     const totalCauses = D.categories.reduce((a, c) => a + c.causes.length, 0);
+    const fit = this.getFit();
 
     container.innerHTML = `
       <div class="page-head">
@@ -135,11 +142,18 @@ const Fishbone = {
         </div>
       </div>
 
-      <div class="card fb-card">
+      <div class="card fb-card ${fit ? 'fit' : 'full'}">
+        <div class="fb-toolbar">
+          <span class="muted small fb-mode-hint">${fit
+            ? icon('expand') + ' Whole diagram visible at once — it scales to your screen.'
+            : icon('arrows-left-right') + ' Full size — scroll sideways to see the whole fish.'}</span>
+          <button class="btn btn-sm" id="fb-fit-toggle">
+            ${fit ? icon('magnifying-glass-plus') + ' Full size' : icon('magnifying-glass-minus') + ' Fit width'}
+          </button>
+        </div>
         <div class="fb-scroll">
           <svg class="fb-svg" width="${this.W}" height="${this.H}" viewBox="0 0 ${this.W} ${this.H}" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
-        <div class="fb-scroll-hint muted small">${icon('arrows-left-right')} Drag / scroll horizontally to see the whole fish.</div>
       </div>
 
       <div class="fb-below">
@@ -161,6 +175,11 @@ const Fishbone = {
     this.buildSvg(qs('.fb-svg', container));
 
     container.onclick = e => {
+      const fitBtn = e.target.closest('#fb-fit-toggle');
+      if (fitBtn) {
+        Utils.pref('fbFit', !this.getFit());
+        return this.page(container);
+      }
       const chip = e.target.closest('.fb-chip');
       if (chip) {
         chip.closest('.fb-cat').classList.toggle('collapsed');
