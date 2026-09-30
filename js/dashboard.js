@@ -206,11 +206,42 @@ const Dashboard = {
 
     const stats = Analytics.todayStats();
 
+    const missed = (App.state.tasks || [])
+      .filter(t => !t._archived && t.status !== 'completed' && t.scheduled_date && t.scheduled_date < today)
+      .sort((a, b) => String(a.scheduled_date).localeCompare(String(b.scheduled_date)));
+
     container.innerHTML = `
       <div class="dash-greeting">
         <h2>Today</h2>
         <p class="muted">${Utils.fmtDay(today)} — plan the day, then work the plan.</p>
       </div>
+
+      ${missed.length ? `
+      <div class="card missed-alert">
+        <div class="missed-head">
+          <span class="missed-title">${icon('triangle-exclamation')} ${missed.length} task${missed.length > 1 ? 's' : ''} missed from earlier days</span>
+          <span class="muted small">Finish them today, or push forward — don't let them pile up.</span>
+        </div>
+        ${missed.map(t => {
+          const daysOver = Math.round((Utils.parseDate(today) - Utils.parseDate(t.scheduled_date)) / 86400000);
+          return `
+          <div class="missed-row" data-id="${t.id}">
+            <div class="task-main">
+              <b>${Utils.esc(t.title)}</b>
+              <div class="task-meta">
+                ${chip('due ' + Utils.fmtDate(t.scheduled_date), '#ef4444')}
+                ${chip(daysOver + 'd overdue', '#ef4444')}
+                ${t.priority ? chip(t.priority, Utils.priorityColor(t.priority)) : ''}
+              </div>
+            </div>
+            <div class="task-actions">
+              <button class="btn btn-sm btn-primary" data-missed-act="do-today" title="Schedule for today">${icon('calendar-check')} Do today</button>
+              <button class="btn btn-sm" data-missed-act="snooze" title="Push to tomorrow">${icon('forward')} +1d</button>
+              <button class="btn btn-sm btn-success" data-missed-act="complete" title="Mark complete">${icon('check')}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
 
       <div class="card morning-plan">
         <h3 class="card-title">${icon('mug-hot')} Morning plan</h3>
@@ -297,6 +328,23 @@ const Dashboard = {
 
   /* Shared click handling for dashboard + today */
   onClick(e) {
+    const mbtn = e.target.closest('[data-missed-act]');
+    if (mbtn) {
+      const id = mbtn.closest('[data-id]').dataset.id;
+      const act = mbtn.dataset.missedAct;
+      if (act === 'complete') return Tasks.handleCardAction('toggle', id);
+      const patch = act === 'do-today'
+        ? { scheduled_date: Utils.today() }
+        : { scheduled_date: Utils.addDays(Utils.today(), 1) };
+      API.updateTask(id, patch)
+        .then(rec => {
+          App.replaceRecord('tasks', rec);
+          App.refreshCurrent();
+          toast(act === 'do-today' ? '📅 Task moved to today.' : '⏭ Task pushed to tomorrow.', 'success');
+        })
+        .catch(err => App.handleError(err));
+      return;
+    }
     const qa = e.target.closest('[data-qa]');
     if (qa) {
       if (qa.dataset.qa === 'task') Tasks.openForm();

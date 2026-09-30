@@ -147,6 +147,7 @@ const App = {
         this.hideError();
         this.hideSetupBanner();
         this.updateUpgradeBanner();
+        this.notifyMissed();
       }
     } catch (e) {
       this.online = false;
@@ -219,6 +220,19 @@ const App = {
     b.hidden = false;
   },
   hideSetupBanner() { qs('#setup-banner').hidden = true; },
+
+  /** Once per day: notify about tasks missed from earlier days. */
+  notifyMissed() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const missed = (this.state.tasks || []).filter(t =>
+      !t._archived && t.status !== 'completed' && t.scheduled_date && t.scheduled_date < Utils.today());
+    if (!missed.length) return;
+    const key = 'notified.missed.' + Utils.today();
+    if (Utils.pref(key)) return;
+    Utils.pref(key, true);
+    notify('⚠️ ' + missed.length + ' task' + (missed.length > 1 ? 's' : '') + ' missed!',
+      missed.slice(0, 3).map(t => t.title).join(' · ') + (missed.length > 3 ? ' …' : '') + ' — plan them today.');
+  },
 
   updateUpgradeBanner() {
     const b = qs('#upgrade-banner');

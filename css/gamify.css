@@ -275,3 +275,30 @@
 .opt-chip .opt-x:hover { background: var(--c-danger); color: #fff; }
 .opt-add { display: flex; gap: 8px; }
 .opt-add input { flex: 1; }
+
+/* ---------- Missed-task alert (Today page) ---------- */
+.missed-alert {
+  border: 1.5px solid color-mix(in srgb, var(--c-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--c-danger) 7%, var(--bg-card));
+  margin-bottom: 14px;
+}
+.missed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.missed-title { font-weight: 800; color: var(--c-danger); display: flex; align-items: center; gap: 8px; }
+.missed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  margin-bottom: 6px;
+}
+.missed-row:last-child { margin-bottom: 0; }
+.missed-row .task-actions { flex-wrap: wrap; }

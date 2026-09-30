@@ -16,7 +16,8 @@ const Options = {
     ctfCategories: ['Web', 'Crypto', 'Pwn', 'Reverse', 'Forensics', 'OSINT', 'Misc'],
     difficulties: ['Easy', 'Medium', 'Hard', 'Insane'],
     studyTypes: ['Writeup', 'HTB Module', 'PortSwigger', 'Other'],
-    taskCategories: ['Learning', 'Projects', 'Work', 'Personal', 'Entertainment', 'Other']
+    taskCategories: ['Learning', 'Projects', 'Work', 'Personal', 'Entertainment', 'Other'],
+    distractionCategories: ['Entertainment', 'Distraction']
   },
 
   LABELS: {
@@ -24,10 +25,11 @@ const Options = {
     ctfCategories: 'CTF Categories',
     difficulties: 'Difficulty levels',
     studyTypes: 'Study module types',
-    taskCategories: 'Task / Goal categories'
+    taskCategories: 'Task / Goal categories',
+    distractionCategories: 'Distraction categories'
   },
 
-  GROUP_KEYS: ['platforms', 'ctfCategories', 'difficulties', 'studyTypes', 'taskCategories'],
+  GROUP_KEYS: ['platforms', 'ctfCategories', 'difficulties', 'studyTypes', 'taskCategories', 'distractionCategories'],
 
   raw() {
     try { return JSON.parse(App.settings.custom_options || '{}') || {}; }

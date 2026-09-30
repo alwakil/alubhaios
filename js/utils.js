@@ -126,6 +126,9 @@ const Utils = {
   },
 
   isDistraction(category) {
+    try {
+      if (typeof Options !== 'undefined') return Options.get('distractionCategories').includes(category);
+    } catch (e) { /* fall through to defaults */ }
     return (CONFIG.DISTRACTION_CATEGORIES || []).includes(category);
   },
 

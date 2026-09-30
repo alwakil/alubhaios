@@ -37,6 +37,8 @@ const Analytics = {
     const realLogs = logs.filter(l => !/❄|freeze/i.test(String(l.note || '')));
 
     const tasksToday = (App.state.tasks || []).filter(t => t.scheduled_date === date);
+    // "missed" = was scheduled on a PAST day and is still not done today
+    const tasksMissed = tasksToday.filter(t => t.status !== 'completed' && date < Utils.today()).length;
     const doneToday = (App.state.tasks || []).filter(t => this.taskCompletedDate(t) === date);
     const completedOfPlanned = tasksToday.filter(t => t.status === 'completed').length;
 
@@ -73,6 +75,7 @@ const Analytics = {
       tasksCompleted: completedOfPlanned,
       tasksCompletedAt: doneToday.length,
       tasksRemaining: tasksToday.length - completedOfPlanned,
+      tasksMissed: tasksMissed,
       focusMinutes: focusMin,
       distractionMinutes: distrMin,
       habitDone: habitDone,
@@ -300,6 +303,12 @@ const Analytics = {
       }
     }
 
+    const weekly = this.dailyStats(7).slice(0, 6); // yesterday and before (today is not "missed" yet)
+    const missedWeek = weekly.reduce((a, d) => a + d.tasksMissed, 0);
+    if (missedWeek >= 3) {
+      out.push({ icon: 'bell', tone: 'bad', text: `You missed ${missedWeek} tasks in the last 6 days — reschedule them before they pile up.` });
+    }
+
     const best = this.bestWeekday(28);
     if (best) {
       out.push({ icon: 'calendar-week', tone: 'info', text: `You tend to complete more tasks on ${best.weekday}days.` });
@@ -486,6 +495,8 @@ const AnalyticsPage = {
         </div>
       </div>
 
+      <div class="card chart-card" id="missed-chart"></div>
+
       <div class="card chart-card" id="best-time"></div>
 
       <div id="an-planning"></div>
@@ -507,6 +518,35 @@ const AnalyticsPage = {
     this.planningCard();
     this.yearHeatmap();
     this.bestTimeCard();
+    this.missedChart();
+  },
+
+  /** Completed vs missed tasks — stacked per day, last 14 days. */
+  missedChart() {
+    const wrap = qs('#missed-chart', App.container());
+    if (!wrap) return;
+    const daily = Analytics.dailyStats(14).slice(-14);
+    const hasAny = daily.some(d => d.tasksCompletedAt > 0 || d.tasksMissed > 0);
+    if (!hasAny) {
+      wrap.appendChild(el(emptyState('calendar-xmark', 'Completed vs missed tasks',
+        'Schedule tasks with a date — completed and missed days appear here.')));
+      return;
+    }
+    wrap.innerHTML = `
+      <h3 class="card-title">${icon('calendar-xmark')} Completed vs missed tasks — last 14 days</h3>
+      <p class="muted small">Missed = was scheduled that day but is still pending today. Today's open tasks are not counted yet.</p>
+      <div class="chart-box"><canvas id="missed-canvas"></canvas></div>`;
+    Charts.make('missed-canvas', {
+      type: 'bar',
+      data: {
+        labels: daily.map(d => d.date.slice(5)),
+        datasets: [
+          { label: 'Completed', data: daily.map(d => d.tasksCompletedAt), backgroundColor: '#10b981', borderRadius: 3, stack: 's' },
+          { label: 'Missed', data: daily.map(d => d.tasksMissed), backgroundColor: '#ef4444', borderRadius: 3, stack: 's' }
+        ]
+      },
+      options: Charts.lineOpts({ plugins: { legend: { display: true, position: 'bottom' } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { maxTicksLimit: 10, maxRotation: 0 } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } })
+    });
   },
 
   /** "Best time to study" card — focus minutes per part of the day. */
