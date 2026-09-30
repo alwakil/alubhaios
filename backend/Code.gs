@@ -42,6 +42,10 @@ var SCHEMA = {
   WeeklyReviews: ['id', 'week_start', 'week_end', 'planned_tasks', 'completed_tasks',
                   'focus_minutes', 'distraction_minutes', 'biggest_win',
                   'biggest_problem', 'next_week_focus', 'notes'],
+  StudyModules: ['id', 'title', 'type', 'total_units', 'done_units', 'status',
+                 'link', 'notes', 'created_at', 'updated_at'],
+  Challenges: ['id', 'name', 'platform', 'category', 'difficulty', 'status',
+               'link', 'solved_date', 'notes', 'created_at', 'updated_at'],
   Settings: ['key', 'value']
 };
 
@@ -157,6 +161,8 @@ function getAllData_() {
     focusSessions: list_('FocusSessions'),
     dailyReviews: list_('DailyReviews'),
     weeklyReviews: list_('WeeklyReviews'),
+    studyModules: list_('StudyModules'),
+    challenges: list_('Challenges'),
     settings: getSettings_(),
     serverTime: nowIso_()
   };
@@ -341,6 +347,44 @@ function writeAction_(action, data) {
       requireId_(data.id, 'weekly review');
       deleteRecord_('WeeklyReviews', data.id);
       return ok_('Weekly review deleted', { id: data.id });
+
+    /* ---------------- Study modules (Writeups / HTB / PortSwigger) ------ */
+    case 'createStudyModule':
+      requireText_(data.title, 'Module title');
+      var smDefaults = {
+        type: data.type || 'HTB Module', total_units: data.total_units || 1,
+        done_units: data.done_units || 0, status: data.status || 'active',
+        link: data.link || '', notes: data.notes || ''
+      };
+      return ok_('Study module created', createRecord_('StudyModules', mergeDefaults_(data, smDefaults)));
+
+    case 'updateStudyModule':
+      requireId_(data.id, 'study module');
+      return ok_('Study module updated', updateRecord_('StudyModules', data.id, patchOf_(data)));
+
+    case 'deleteStudyModule':
+      requireId_(data.id, 'study module');
+      deleteRecord_('StudyModules', data.id);
+      return ok_('Study module deleted', { id: data.id });
+
+    /* ---------------- CTF challenges ---------------- */
+    case 'createChallenge':
+      requireText_(data.name, 'Challenge name');
+      var chDefaults = {
+        platform: data.platform || 'HTB', category: data.category || 'Web',
+        difficulty: data.difficulty || 'Easy', status: data.status || 'unsolved',
+        link: data.link || '', solved_date: data.solved_date || '', notes: data.notes || ''
+      };
+      return ok_('Challenge created', createRecord_('Challenges', mergeDefaults_(data, chDefaults)));
+
+    case 'updateChallenge':
+      requireId_(data.id, 'challenge');
+      return ok_('Challenge updated', updateRecord_('Challenges', data.id, patchOf_(data)));
+
+    case 'deleteChallenge':
+      requireId_(data.id, 'challenge');
+      deleteRecord_('Challenges', data.id);
+      return ok_('Challenge deleted', { id: data.id });
 
     /* ---------------- Settings ---------------- */
     case 'saveSettings':

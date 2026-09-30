@@ -235,6 +235,31 @@ const Analytics = {
     return Utils.pct(done, days);
   },
 
+  /** Which part of the day gets the most focus? Computed from real sessions. */
+  bestTime() {
+    const buckets = [
+      { key: 'Night', label: '12am–6am', from: 0, to: 5 },
+      { key: 'Morning', label: '6am–12pm', from: 6, to: 11 },
+      { key: 'Afternoon', label: '12pm–6pm', from: 12, to: 17 },
+      { key: 'Evening', label: '6pm–12am', from: 18, to: 23 }
+    ];
+    const rows = buckets.map(b => ({ bucket: b.key, label: b.label, from: b.from, to: b.to, minutes: 0, sessions: 0, ratingSum: 0, rated: 0 }));
+    (App.state.focusSessions || []).forEach(x => {
+      const h = Number(String(x.start_time || '').slice(11, 13));
+      if (isNaN(h)) return;
+      const row = rows.find(r => h >= r.from && h <= r.to);
+      if (!row) return;
+      row.minutes += Utils.num(x.duration_minutes);
+      row.sessions++;
+      if (Utils.num(x.focus_rating)) { row.ratingSum += Utils.num(x.focus_rating); row.rated++; }
+    });
+    rows.forEach(r => { r.avgRating = r.rated ? Math.round(r.ratingSum / r.rated * 10) / 10 : 0; });
+    const eligible = rows.filter(r => r.sessions >= 2);
+    if (!eligible.length) return null;
+    eligible.sort((a, b) => b.minutes - a.minutes);
+    return { best: eligible[0], all: rows };
+  },
+
   /** Human-readable insights generated from real comparisons. */
   insights() {
     const out = [];
@@ -278,6 +303,11 @@ const Analytics = {
     const best = this.bestWeekday(28);
     if (best) {
       out.push({ icon: 'calendar-week', tone: 'info', text: `You tend to complete more tasks on ${best.weekday}days.` });
+    }
+
+    const bt = this.bestTime();
+    if (bt) {
+      out.push({ icon: 'clock', tone: 'info', text: `You focus best in the ${bt.best.bucket.toLowerCase()} (${bt.best.label}) — ${Utils.fmtMinutes(bt.best.minutes)} logged there.` });
     }
 
     const cats = this.categoryDistribution(7);
@@ -456,6 +486,8 @@ const AnalyticsPage = {
         </div>
       </div>
 
+      <div class="card chart-card" id="best-time"></div>
+
       <div id="an-planning"></div>
     `;
 
@@ -474,6 +506,34 @@ const AnalyticsPage = {
     Dashboard.focusDistractionChart('an-focus-distraction', daily);
     this.planningCard();
     this.yearHeatmap();
+    this.bestTimeCard();
+  },
+
+  /** "Best time to study" card — focus minutes per part of the day. */
+  bestTimeCard() {
+    const wrap = qs('#best-time', App.container());
+    if (!wrap) return;
+    const bt = Analytics.bestTime();
+    if (!bt) {
+      wrap.appendChild(el(emptyState('clock', 'Best time to study',
+        'Log a few focus sessions — your most productive time of day shows up here.')));
+      return;
+    }
+    const max = Math.max.apply(null, bt.all.map(r => r.minutes).concat([1]));
+    const ratingText = bt.best.avgRating ? ` · avg focus rating ${bt.best.avgRating}/5` : '';
+    wrap.innerHTML = `
+      <div class="card chart-card">
+        <h3 class="card-title">${icon('clock')} Best time to study</h3>
+        <p class="muted small">Your sharpest window: <b>${Utils.esc(bt.best.bucket)} (${Utils.esc(bt.best.label)})</b>${ratingText}</p>
+        <div class="bt-rows">
+          ${bt.all.map(r => `
+            <div class="bt-row ${r.bucket === bt.best.bucket ? 'best' : ''}">
+              <span class="bt-name">${Utils.esc(r.bucket)} <span class="muted small">(${Utils.esc(r.label)})</span></span>
+              <div class="bt-bar"><div class="bt-fill" style="width:${Math.round(r.minutes / max * 100)}%"></div></div>
+              <span class="bt-val">${Utils.fmtMinutes(r.minutes)} · ${r.sessions}×</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
   },
 
   /** GitHub-style 365-day heatmap of the daily productivity score. */

@@ -6,6 +6,7 @@
 const Tasks = {
   filter: { status: '', category: '', priority: '', goal: '', date: '', search: '' },
   showArchived: false,
+  view: 'list',
 
   page(container) {
     const f = this.filter;
@@ -16,6 +17,10 @@ const Tasks = {
         <h2>Tasks</h2>
         <div class="tasks-head-actions">
           ${archivedCount ? `<button class="btn btn-sm ${this.showArchived ? 'btn-primary' : ''}" data-act="toggle-archived" title="Show/hide archived tasks">${icon('box-archive')} Archived (${archivedCount})</button>` : ''}
+          <div class="seg">
+            <button class="${this.view === 'list' ? 'on' : ''}" data-act="view-list" title="List view">${icon('list')} List</button>
+            <button class="${this.view === 'projects' ? 'on' : ''}" data-act="view-projects" title="Group by project">${icon('folder-tree')} Projects</button>
+          </div>
           <button class="btn btn-primary" data-act="new">${icon('plus')} New task</button>
         </div>
       </div>
@@ -59,6 +64,8 @@ const Tasks = {
     container.onclick = e => {
       if (e.target.closest('[data-act="new"]')) return this.openForm();
       if (e.target.closest('[data-act="toggle-archived"]')) { this.showArchived = !this.showArchived; return this.page(container); }
+      if (e.target.closest('[data-act="view-list"]')) { this.view = 'list'; return this.page(container); }
+      if (e.target.closest('[data-act="view-projects"]')) { this.view = 'projects'; return this.page(container); }
       if (e.target.closest('[data-act="clear-filters"]')) {
         this.filter = { status: '', category: '', priority: '', goal: '', date: '', search: '' };
         return this.page(container);
@@ -67,7 +74,7 @@ const Tasks = {
       if (btn) this.handleCardAction(btn.dataset.taskAction, btn.closest('[data-id]').dataset.id);
     };
 
-    this.renderList();
+    this.renderCurrentView();
   },
 
   readFilters() {
@@ -79,6 +86,46 @@ const Tasks = {
     f.priority = qs('#tf-priority', c) ? qs('#tf-priority', c).value : f.priority;
     f.goal = qs('#tf-goal', c) ? qs('#tf-goal', c).value : f.goal;
     f.date = qs('#tf-date', c) ? qs('#tf-date', c).value : f.date;
+  },
+
+  renderCurrentView() {
+    if (this.view === 'projects') return this.renderProjects();
+    this.renderList();
+  },
+
+  /** Project view: group the filtered tasks by their project tag. */
+  renderProjects() {
+    const list = qs('#task-list', App.container());
+    if (!list) return;
+    const items = this.filtered();
+    if (!items.length) return this.renderList();
+
+    const groups = {};
+    items.forEach(t => {
+      const key = t.project_id ? t.project_id : 'No project';
+      (groups[key] = groups[key] || []).push(t);
+    });
+    const keys = Object.keys(groups).sort((a, b) => {
+      if (a === 'No project') return 1;
+      if (b === 'No project') return -1;
+      return a.localeCompare(b);
+    });
+
+    list.innerHTML = keys.map(key => {
+      const g = groups[key];
+      const done = g.filter(t => t.status === 'completed').length;
+      const pct = Utils.pct(done, g.length);
+      return `
+      <div class="project-group">
+        <div class="project-head">
+          <span class="project-name">${key === 'No project' ? icon('inbox') : icon('folder-open')} ${Utils.esc(key)}</span>
+          <span class="muted small">${done}/${g.length} done</span>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <b class="small">${pct}%</b>
+        </div>
+        <div class="stack" style="margin-top:8px">${g.map(t => this.taskCard(t)).join('')}</div>
+      </div>`;
+    }).join('');
   },
 
   filtered() {

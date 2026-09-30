@@ -120,6 +120,14 @@ const API = {
   createWeeklyReview(data) { return this.call('createWeeklyReview', data); },
   deleteWeeklyReview(id) { return this.call('deleteWeeklyReview', { id: id }); },
 
+  /* -------- study modules / CTF challenges -------- */
+  createStudyModule(data) { return this.call('createStudyModule', data); },
+  updateStudyModule(id, patch) { return this.call('updateStudyModule', Object.assign({ id: id }, patch)); },
+  deleteStudyModule(id) { return this.call('deleteStudyModule', { id: id }); },
+  createChallenge(data) { return this.call('createChallenge', data); },
+  updateChallenge(id, patch) { return this.call('updateChallenge', Object.assign({ id: id }, patch)); },
+  deleteChallenge(id) { return this.call('deleteChallenge', { id: id }); },
+
   /* -------- settings / reset -------- */
   saveSettings(settingsObj) { return this.call('saveSettings', { settings: settingsObj }); },
   archiveOldData(days) { return this.call('archiveOldData', { days: days }); },

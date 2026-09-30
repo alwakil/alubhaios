@@ -1,0 +1,112 @@
+/* ============================================================
+   PersonalOS — Study trackers (modules + CTF), project view,
+   best-time card, coach tips
+   ============================================================ */
+
+/* ---------- segmented view toggle (Tasks: List / Projects) ---------- */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.seg button {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--c-primary); color: var(--on-primary); }
+
+/* ---------- Project groups ---------- */
+.project-group { margin-bottom: 14px; }
+.project-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px 12px 0 0;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-bottom: none;
+}
+.project-name { font-weight: 700; font-size: 13.5px; flex: none; }
+.project-head .progress-bar { max-width: 220px; margin-left: auto; }
+.project-group .stack { padding: 0 0; }
+
+/* ---------- Study modules ---------- */
+.module-card .task-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.module-card .task-actions .btn-sm { height: 32px; padding: 6px 12px; }
+
+/* ---------- CTF ---------- */
+.ctf-solved { color: var(--c-success); }
+.challenge-card .task-actions .btn-sm { height: 32px; padding: 6px 12px; }
+#ctf-platform {
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+/* ---------- Best time to study ---------- */
+.bt-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bt-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 130px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.bt-row.best { background: var(--c-primary-soft); }
+.bt-row.best .bt-name { font-weight: 700; }
+.bt-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-bar { height: 10px; border-radius: 999px; background: var(--bg-hover); overflow: hidden; }
+.bt-fill { height: 100%; background: linear-gradient(90deg, var(--c-primary), #8a97a8); border-radius: 999px; }
+.bt-row.best .bt-fill { background: var(--c-success); }
+.bt-val { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- Coach tips (weekly report) ---------- */
+.coach-tips {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-hover);
+  border: 1px dashed var(--border);
+}
+.coach-title {
+  font-weight: 800;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--c-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.coach-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  padding: 5px 0;
+}
+.coach-tip i { margin-top: 3px; }
+.coach-tip.tone-good i { color: var(--c-success); }
+.coach-tip.tone-warn i { color: var(--c-warn); }
+.coach-tip.tone-bad i { color: var(--c-danger); }
+.coach-tip.tone-info i { color: var(--c-primary); }
+
+@media (max-width: 768px) {
+  .bt-row { grid-template-columns: 110px 1fr; }
+  .bt-val { grid-column: 2; text-align: left; }
+}

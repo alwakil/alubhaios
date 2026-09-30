@@ -260,6 +260,34 @@ const Reviews = {
           ${deltaChip('Tasks completed', sum('tasksCompleted'), pSum('tasksCompleted'), v => v)}
           ${deltaChip('Habit consistency', habitPct, pHabitPct, v => v + '%')}
         </div>
+        ${(() => {
+          const tips = [];
+          if (pSum('distractionMinutes') > 0 && sum('distractionMinutes') > pSum('distractionMinutes') * 1.2) {
+            tips.push(['phone-flip', 'bad', `Distraction time rose to ${Utils.fmtMinutes(sum('distractionMinutes'))} — try a distraction log next week.`]);
+          }
+          if (sum('habitTotal') > 0 && habitPct < 50) {
+            tips.push(['seedling', 'warn', `Habit consistency is only ${habitPct}% — shrink the habits until they feel easy, then grow.`]);
+          }
+          const planAcc = Analytics.planningAccuracy(30);
+          if (planAcc && planAcc.underestimatePct >= 25) {
+            tips.push(['clock-rotate-left', 'warn', `You underestimate tasks by ~${planAcc.underestimatePct}% — add buffer time to estimates.`]);
+          }
+          const weekReviews = (App.state.dailyReviews || []).filter(r => {
+            const d = String(r.date).slice(0, 10);
+            return d >= weekStart && d <= weekEnd;
+          }).length;
+          if (weekReviews === 0) {
+            tips.push(['pen-to-square', 'info', 'No daily reviews this week — two minutes each evening makes next week smarter.']);
+          }
+          if (pAvgScore > 0 && avgScore >= pAvgScore && sum('focusMinutes') >= pSum('focusMinutes') && sum('tasksCompleted') >= pSum('tasksCompleted')) {
+            tips.push(['trophy', 'good', 'Everything held or improved vs last week — keep the momentum going!']);
+          }
+          if (!tips.length) return '';
+          return `<div class="coach-tips">
+            <div class="coach-title">${icon('user-graduate')} Coach says</div>
+            ${tips.map(t => `<div class="coach-tip tone-${t[1]}">${icon(t[0])}<span>${Utils.esc(t[2])}</span></div>`).join('')}
+          </div>`;
+        })()}
         ${bestDay ? `<div class="wr-days">
           <span class="chip" style="--chip-c:#10b981">${icon('trophy')} Best day: <b>&nbsp;${Utils.fmtDay(bestDay.date)}</b> (${bestDay.score}/100)</span>
           ${worstDay && worstDay.date !== bestDay.date ? `<span class="chip" style="--chip-c:#64748b">${icon('cloud-rain')} Toughest day: <b>&nbsp;${Utils.fmtDay(worstDay.date)}</b> (${worstDay.score}/100)</span>` : ''}

@@ -23,19 +23,21 @@ const Gamify = {
     const focusMin = (s.focusSessions || []).reduce((a, x) => a + Utils.num(x.duration_minutes), 0);
     const daily = (s.dailyReviews || []).length;
     const weekly = (s.weeklyReviews || []).length;
+    const ctf = (s.challenges || []).filter(c => c.status === 'solved').length;
     return {
       tasks: tasks * 10,
       habits: habits * 5,
       focus: Math.floor(focusMin / 3),
       dailyReviews: daily * 15,
       weeklyReviews: weekly * 25,
-      _counts: { tasks, habits, focusMin, daily, weekly }
+      ctf: ctf * 15,
+      _counts: { tasks, habits, focusMin, daily, weekly, ctf }
     };
   },
 
   xp() {
     const b = this.xpBreakdown();
-    return b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews;
+    return b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf;
   },
 
   level(xp) {

@@ -13,6 +13,7 @@ const PAGES = {
   habits:    { title: 'Habits',    render: c => Habits.page(c) },
   badges:    { title: 'Badges',    render: c => Badges.page(c) },
   focus:     { title: 'Focus',     render: c => Focus.page(c) },
+  study:     { title: 'Study',     render: c => Study.page(c) },
   analytics: { title: 'Analytics', render: c => AnalyticsPage.page(c) },
   fishbone:  { title: 'Fishbone',  render: c => Fishbone.page(c) },
   reviews:   { title: 'Reviews',   render: c => Reviews.page(c) },
@@ -20,7 +21,7 @@ const PAGES = {
 };
 
 const App = {
-  state: { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [] },
+  state: { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [] },
   settings: {},
   current: 'dashboard',
   theme: 'dark',
@@ -125,7 +126,7 @@ const App = {
     this.setLoading(true, 'Loading dashboard…');
     try {
       if (!API.configured()) {
-        this.state = { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [] };
+        this.state = { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [] };
         this.settings = Object.assign({}, CONFIG.DEFAULTS);
         this.online = false;
         this.showSetupBanner();
@@ -133,7 +134,7 @@ const App = {
         const data = await API.getAll();
         const archived = (data.archivedTasks || []).map(t => Object.assign({}, t, { _archived: true }));
         this.state.tasks = (data.tasks || []).concat(archived);
-        ['goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews']
+        ['goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews', 'studyModules', 'challenges']
           .forEach(k => { this.state[k] = data[k] || []; });
         this.settings = Object.assign({}, CONFIG.DEFAULTS, data.settings || {});
         this.online = true;
