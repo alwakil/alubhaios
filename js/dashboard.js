@@ -181,13 +181,12 @@ const Dashboard = {
   renderToday(container) {
     const today = Utils.today();
     const wd = Utils.weekdayShort(today);
+    // only tasks scheduled for TODAY — missed/overdue tasks live in the red alert above
     const tasksToday = (App.state.tasks || [])
-      .filter(t => t.scheduled_date === today || (t.scheduled_date && t.scheduled_date < today && t.status !== 'completed'))
+      .filter(t => !t._archived && t.scheduled_date === today)
       .sort((a, b) => {
         const r = { high: 0, medium: 1, low: 2 };
-        const overdueA = a.scheduled_date < today && a.status !== 'completed' ? 1 : 0;
-        const overdueB = b.scheduled_date < today && b.status !== 'completed' ? 1 : 0;
-        return (overdueB - overdueA) || (r[a.priority] - r[b.priority]) || String(a.target_time || a.created_at).localeCompare(String(b.created_at));
+        return (r[a.priority] - r[b.priority]) || String(a.created_at).localeCompare(String(b.created_at));
       });
     const top3 = tasksToday.filter(t => t.status !== 'completed').slice(0, 3);
     const top3Ids = top3.map(t => t.id);

@@ -7,7 +7,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'personalos-v1.5.2';
+const CACHE = 'personalos-v1.5.3';
 const CORE = [
   'index.html',
   'manifest.webmanifest',
