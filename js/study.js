@@ -86,11 +86,7 @@ const Study = {
     const list = qs('#module-list', container);
     const filtered = mods
       .filter(m => this.typeFilter === 'All' || m.type === this.typeFilter)
-      .sort((a, b) => {
-        const ac = a.status === 'completed' ? 1 : 0;
-        const bc = b.status === 'completed' ? 1 : 0;
-        return (ac - bc) || (Utils.pct(Utils.num(b.done_units), Utils.num(b.total_units)) - Utils.pct(Utils.num(a.done_units), Utils.num(a.total_units)));
-      });
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))); // newest added shows first
 
     if (!filtered.length) {
       list.innerHTML = '';
@@ -251,7 +247,7 @@ const Study = {
       .sort((a, b) => {
         const as = a.status === 'solved' ? 1 : 0;
         const bs = b.status === 'solved' ? 1 : 0;
-        return (as - bs) || String(b.solved_date || '').localeCompare(String(a.solved_date || ''));
+        return (as - bs) || String(b.created_at || '').localeCompare(String(a.created_at || ''));
       });
 
     if (!chs.length) {
