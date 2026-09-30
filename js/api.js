@@ -34,6 +34,10 @@ const API = {
       throw err;
     }
     const maxTries = (_retries === undefined && this.isRead(action)) ? 2 : 1;
+    data = Object.assign({}, data);
+    // Client-side idempotency key: if Apps Script double-executes a POST,
+    // the backend recognises the id and does not create a duplicate.
+    if (/^create/.test(action) && data && !data.id) data.id = Utils.uid();
     let lastErr;
     for (let attempt = 1; attempt <= maxTries; attempt++) {
       try {

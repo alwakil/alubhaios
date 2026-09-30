@@ -640,6 +640,14 @@ function normalize_(header, v) {
 function createRecord_(name, obj) {
   var sh = getSheet_(name);
   var headers = headers_(sh);
+  // Idempotency guard: Apps Script occasionally executes a POST twice
+  // (redirect re-send). If the caller supplied an id that already exists,
+  // update that row instead of appending a duplicate.
+  if (obj.id) {
+    try {
+      return updateRecord_(name, obj.id, obj);
+    } catch (e) { /* id not found yet → proceed with a fresh append */ }
+  }
   if (!obj.id) obj.id = newId_();
   if (!obj.created_at) obj.created_at = nowIso_();
   obj.updated_at = nowIso_();
