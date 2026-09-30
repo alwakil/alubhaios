@@ -235,3 +235,43 @@
   .level-row { flex-direction: column; align-items: stretch; }
   .level-num { align-self: center; }
 }
+
+/* ---------- Custom options manager (Settings) ---------- */
+.opt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.opt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--c-primary-soft);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--c-primary) 35%, transparent);
+}
+.opt-chip .opt-x {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: color-mix(in srgb, var(--c-danger) 20%, transparent);
+  color: var(--c-danger);
+  font-size: 9px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.opt-chip .opt-x:hover { background: var(--c-danger); color: #fff; }
+.opt-add { display: flex; gap: 8px; }
+.opt-add input { flex: 1; }

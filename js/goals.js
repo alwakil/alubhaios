@@ -214,7 +214,7 @@ const Goals = {
             <textarea name="description" rows="2">${Utils.esc(g.description || '')}</textarea></label>
           <div class="field-row">
             <label class="field"><span>Category</span>
-              <select name="category">${CONFIG.CATEGORIES.map(c => `<option ${g.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+              <select name="category">${Options.get('taskCategories').map(c => `<option ${g.category === c ? 'selected' : ''}>${Utils.esc(c)}</option>`).join('')}</select></label>
             <label class="field"><span>Target date</span>
               <input type="date" name="target_date" value="${Utils.esc(g.target_date || '')}"></label>
           </div>

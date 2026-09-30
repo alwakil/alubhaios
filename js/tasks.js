@@ -33,7 +33,7 @@ const Tasks = {
         </select>
         <select id="tf-category">
           <option value="">All categories</option>
-          ${CONFIG.CATEGORIES.map(c => `<option value="${c}" ${f.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+          ${Options.get('taskCategories').map(c => `<option value="${Utils.esc(c)}" ${f.category === Utils.esc(c) ? 'selected' : ''}>${Utils.esc(c)}</option>`).join('')}
         </select>
         <select id="tf-priority">
           <option value="">All priorities</option>
@@ -281,7 +281,7 @@ const Tasks = {
             <textarea name="description" rows="2" placeholder="Optional details…">${Utils.esc(t.description || '')}</textarea></label>
           <div class="field-row">
             <label class="field"><span>Category</span>
-              <select name="category">${CONFIG.CATEGORIES.map(c => `<option ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+              <select name="category">${Options.get('taskCategories').map(c => `<option ${t.category === c ? 'selected' : ''}>${Utils.esc(c)}</option>`).join('')}</select></label>
             <label class="field"><span>Priority</span>
               <select name="priority">${CONFIG.PRIORITIES.map(p => `<option value="${p}" ${(t.priority || 'medium') === p ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
           </div>

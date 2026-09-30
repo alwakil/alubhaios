@@ -56,6 +56,21 @@ const Settings = {
           <p class="muted small">Full setup guide: see the repository README (Google Sheet → Apps Script → deploy Web App).</p>
         </div>
 
+        <!-- Custom options -->
+        <div class="card">
+          <h3 class="card-title">${icon('sliders')} Custom options</h3>
+          <p class="muted small">Add or remove the options that appear in dropdowns across the app (CTF forms, Study modules, Tasks, Goals, Focus). Removing a default only hides it — existing records keep their values.</p>
+          <label class="field"><span>Option group</span>
+            <select id="opt-group">
+              ${Options.GROUP_KEYS.map(g => `<option value="${g}">${Utils.esc(Options.LABELS[g])}</option>`).join('')}
+            </select></label>
+          <div id="opt-chips" class="opt-chips"></div>
+          <div class="opt-add">
+            <input id="opt-new" placeholder="New option name…" maxlength="40">
+            <button class="btn btn-primary" id="opt-add-btn">${icon('plus')} Add</button>
+          </div>
+        </div>
+
         <!-- Notifications -->
         <div class="card">
           <h3 class="card-title">${icon('bell')} Notifications</h3>
@@ -165,6 +180,41 @@ const Settings = {
           btn.innerHTML = `${icon('satellite-dish')} Test connection`;
           App.refreshCurrent();
         });
+    });
+
+    /* --- custom options manager --- */
+    const renderOptChips = () => {
+      const group = qs('#opt-group', container).value;
+      const wrap = qs('#opt-chips', container);
+      const opts = Options.get(group);
+      wrap.innerHTML = opts.length
+        ? opts.map(o => `
+            <span class="opt-chip">
+              ${Utils.esc(o)}
+              <button class="opt-x" data-opt-remove="${Utils.esc(o)}" title="Remove">${icon('xmark')}</button>
+            </span>`).join('')
+        : '<span class="muted small">No options — add one below.</span>';
+    };
+    renderOptChips();
+    qs('#opt-group', container).addEventListener('change', renderOptChips);
+    const addOpt = async () => {
+      const input = qs('#opt-new', container);
+      const group = qs('#opt-group', container).value;
+      if (!input.value.trim()) return;
+      await Options.add(group, input.value);
+      input.value = '';
+      renderOptChips();
+      toast('Option added ✓ — dropdowns updated.', 'success');
+    };
+    qs('#opt-add-btn', container).addEventListener('click', addOpt);
+    qs('#opt-new', container).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addOpt(); } });
+    container.addEventListener('click', e => {
+      const x = e.target.closest('[data-opt-remove]');
+      if (!x) return;
+      const group = qs('#opt-group', container).value;
+      Options.remove(group, x.dataset.optRemove)
+        .then(() => { renderOptChips(); toast('Option removed — dropdowns updated.', 'info'); })
+        .catch(e2 => App.handleError(e2));
     });
 
     /* --- notifications --- */

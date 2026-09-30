@@ -64,14 +64,14 @@ const Study = {
     container.innerHTML = `
       <div class="fb-head-stats" style="margin-bottom:12px">
         <span class="chip" style="--chip-c:#10b981">${icon('circle-check')} Completed <b>${done}/${total}</b></span>
-        ${this.TYPES.map(t => {
-          const n = mods.filter(m => m.type === t.key).length;
-          return n ? `<span class="chip" style="--chip-c:${t.color}">${Utils.esc(t.label)} <b>${n}</b></span>` : '';
+        ${Options.get('studyTypes').map(t => {
+          const n = mods.filter(m => m.type === t).length;
+          return n ? `<span class="chip" style="--chip-c:${this.typeColor(t)}">${Utils.esc(t)} <b>${n}</b></span>` : '';
         }).join('')}
       </div>
       <div class="tabs" id="module-type-tabs">
-        ${['All'].concat(this.TYPES.map(t => t.key)).map(k =>
-          `<button class="tab ${this.typeFilter === k ? 'active' : ''}" data-mtype="${k}">${k === 'All' ? 'All' : k}</button>`).join('')}
+        ${['All'].concat(Options.get('studyTypes')).map(k =>
+          `<button class="tab ${this.typeFilter === k ? 'active' : ''}" data-mtype="${Utils.esc(k)}">${Utils.esc(k)}</button>`).join('')}
         <span class="topbar-spacer"></span>
         <button class="btn btn-primary btn-sm" data-study-act="new-module">${icon('plus')} New module</button>
       </div>
@@ -132,7 +132,7 @@ const Study = {
 
   openModuleForm(existing) {
     const m = existing || {};
-    const typeOptions = this.TYPES.map(t => `<option value="${t.key}" ${m.type === t.key ? 'selected' : ''}>${t.label}</option>`).join('');
+    const typeOptions = Options.get('studyTypes').map(t => `<option value="${Utils.esc(t)}" ${m.type === t ? 'selected' : ''}>${Utils.esc(t)}</option>`).join('');
     const mod = openModal({
       title: existing ? 'Edit study module' : 'New study module',
       body: `
@@ -292,6 +292,12 @@ const Study = {
     }).join('');
   },
 
+  /** Default platforms + every platform you have already used. */
+  platformSuggestions() {
+    const used = (App.state.challenges || []).map(c => c.platform).filter(Boolean);
+    return [...new Set([...Options.get('platforms'), ...used])];
+  },
+
   openChallengeForm(existing) {
     const c = existing || {};
     const mod = openModal({
@@ -302,19 +308,20 @@ const Study = {
             <input name="name" required maxlength="200" value="${Utils.esc(c.name || '')}" placeholder="e.g. History of Augsburg — HTB"></label>
           <div class="field-row">
             <label class="field"><span>Platform</span>
-              <input name="platform" list="ctf-platforms" value="${Utils.esc(c.platform || '')}" placeholder="HTB / THM / CTFd…">
+              <input name="platform" list="ctf-platforms" value="${Utils.esc(c.platform || '')}" placeholder="Type any platform — e.g. HTB, THM, or your own">
               <datalist id="ctf-platforms">
-                ${['HTB', 'THM', 'PortSwigger', 'CTFd', 'picoCTF', 'pwnable.kr'].map(p => `<option value="${p}">`).join('')}
-              </datalist></label>
+                ${this.platformSuggestions().map(p => `<option value="${Utils.esc(p)}">`).join('')}
+              </datalist>
+              <span class="muted small">Free text — a new platform you type is saved automatically and appears in the filter.</span></label>
             <label class="field"><span>Category</span>
               <select name="category">
-                ${['Web', 'Crypto', 'Pwn', 'Reverse', 'Forensics', 'OSINT', 'Misc'].map(x => `<option ${c.category === x ? 'selected' : ''}>${x}</option>`).join('')}
+                ${Options.get('ctfCategories').map(x => `<option ${c.category === x ? 'selected' : ''}>${Utils.esc(x)}</option>`).join('')}
               </select></label>
           </div>
           <div class="field-row">
             <label class="field"><span>Difficulty</span>
               <select name="difficulty">
-                ${['Easy', 'Medium', 'Hard', 'Insane'].map(x => `<option ${String(c.difficulty || 'Easy').toLowerCase() === x.toLowerCase() ? 'selected' : ''}>${x}</option>`).join('')}
+                ${Options.get('difficulties').map(x => `<option ${String(c.difficulty || 'Easy').toLowerCase() === x.toLowerCase() ? 'selected' : ''}>${Utils.esc(x)}</option>`).join('')}
               </select></label>
             <label class="field"><span>Status</span>
               <select name="status">

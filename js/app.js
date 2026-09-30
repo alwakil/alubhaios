@@ -47,6 +47,10 @@ const App = {
     qs('#btn-search').addEventListener('click', () => openSearch());
     qs('#topbar-timer').addEventListener('click', () => { location.hash = '#/focus'; });
     qs('#error-retry').addEventListener('click', () => { this.hideError(); this.reload(); });
+    qs('#upgrade-dismiss').addEventListener('click', () => {
+      Utils.pref('upgradeDismissed', true);
+      qs('#upgrade-banner').hidden = true;
+    });
 
     document.addEventListener('keydown', e => this.handleKeys(e));
     window.addEventListener('online', () => { this.online = true; this.updateConnUI(); });
@@ -128,6 +132,7 @@ const App = {
       if (!API.configured()) {
         this.state = { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [] };
         this.settings = Object.assign({}, CONFIG.DEFAULTS);
+        this.backendCurrent = false;
         this.online = false;
         this.showSetupBanner();
       } else {
@@ -137,9 +142,11 @@ const App = {
         ['goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews', 'studyModules', 'challenges']
           .forEach(k => { this.state[k] = data[k] || []; });
         this.settings = Object.assign({}, CONFIG.DEFAULTS, data.settings || {});
+        this.backendCurrent = Array.isArray(data.studyModules); // older deploys lack v1.3 sheets
         this.online = true;
         this.hideError();
         this.hideSetupBanner();
+        this.updateUpgradeBanner();
       }
     } catch (e) {
       this.online = false;
@@ -212,6 +219,12 @@ const App = {
     b.hidden = false;
   },
   hideSetupBanner() { qs('#setup-banner').hidden = true; },
+
+  updateUpgradeBanner() {
+    const b = qs('#upgrade-banner');
+    if (!b) return;
+    b.hidden = this.backendCurrent !== false || !!Utils.pref('upgradeDismissed');
+  },
 
   updateConnUI() {
     const dot = qs('#conn-dot');

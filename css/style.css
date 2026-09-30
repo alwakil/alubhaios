@@ -371,6 +371,7 @@ input[readonly] { opacity: 0.7; }
 .banner span { flex: 1; }
 .banner-info { background: var(--c-primary-soft); border: 1px solid color-mix(in srgb, var(--c-primary) 40%, transparent); }
 .banner-error { background: color-mix(in srgb, var(--c-danger) 12%, transparent); border: 1px solid color-mix(in srgb, var(--c-danger) 45%, transparent); }
+.banner-warn { background: color-mix(in srgb, var(--c-warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--c-warn) 45%, transparent); }
 
 #toast-root {
   position: fixed;

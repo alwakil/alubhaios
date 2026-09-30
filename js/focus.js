@@ -298,7 +298,7 @@ const Focus = {
 
     const modeOptions = (CONFIG.FOCUS_MODES || []).map(m =>
       `<option value="${Utils.esc(m.name)}">${Utils.esc(m.name)} · ~${m.suggested_minutes} min</option>`).join('');
-    const categoryOptions = CONFIG.CATEGORIES.map(c => `<option>${c}</option>`).join('');
+    const categoryOptions = Options.get('taskCategories').map(c => `<option>${Utils.esc(c)}</option>`).join('');
     const taskOptions = '<option value="">— no specific task —</option>' + tasks.map(t =>
       `<option value="${t.id}" ${today === t.scheduled_date ? 'data-today="1"' : ''}>${Utils.esc(t.title)}</option>`).join('');
 
@@ -346,7 +346,7 @@ const Focus = {
     const today = Utils.today();
     const taskOptions = '<option value="">— no specific task —</option>' + tasks.map(t =>
       `<option value="${t.id}" ${today === t.scheduled_date ? 'data-today="1"' : ''}>${Utils.esc(t.title)}</option>`).join('');
-    const categoryOptions = CONFIG.CATEGORIES.map(c => `<option>${c}</option>`).join('');
+    const categoryOptions = Options.get('taskCategories').map(c => `<option>${Utils.esc(c)}</option>`).join('');
     const modeOptions = (CONFIG.FOCUS_MODES || []).map(m =>
       `<option value="${Utils.esc(m.name)}">${Utils.esc(m.name)} · ~${m.suggested_minutes} min</option>`).join('');
 
@@ -562,7 +562,7 @@ const Focus = {
             </select></label>
           <div class="field-row">
             <label class="field"><span>Category</span>
-              <select name="category">${CONFIG.CATEGORIES.map(c => `<option ${t.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+              <select name="category">${Options.get('taskCategories').map(c => `<option ${t.category === c ? 'selected' : ''}>${Utils.esc(c)}</option>`).join('')}</select></label>
             <label class="field"><span>Duration (minutes)</span>
               <input type="number" min="1" name="duration_minutes" value="${minutes}"></label>
           </div>
