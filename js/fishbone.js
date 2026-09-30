@@ -204,13 +204,13 @@ const Fishbone = {
 
     /* flowing dots toward the problem */
     for (let i = 0; i < 5; i++) {
-      g.push(`<circle class="fb-flow" cx="0" cy="${this.SPINE_Y}" r="4" style="--fd:${(i * 1.2)}s" style="fill: var(--c-primary)"/>`);
+      g.push(`<circle class="fb-flow" cx="0" cy="${this.SPINE_Y}" r="4" style="--fd:${(i * 1.2)}s; fill: var(--c-primary)"/>`);
     }
 
     /* tail + head */
     g.push(`<polygon class="fb-tail" points="${this.SPINE_X1},405 8,318 ${this.SPINE_X1 - 14},405 8,492" />`);
-    g.push(`<path class="fb-head" d="M ${this.SPINE_X2},330 C 1310,330 1400,360 1448,${this.SPINE_Y} C 1400,450 1310,480 ${this.SPINE_X2},480 Z" />`);
-    g.push(`<foreignObject x="${this.SPINE_X2 + 14}" y="338" width="230" height="134">
+    g.push(`<path class="fb-head" d="M ${this.SPINE_X2},330 C 1310,330 1405,362 1452,${this.SPINE_Y} C 1405,448 1310,480 ${this.SPINE_X2},480 Z" />`);
+    g.push(`<foreignObject x="${this.SPINE_X2 + 8}" y="344" width="176" height="122">
       <div xmlns="http://www.w3.org/1999/xhtml" class="fb-effect">
         <b>${Utils.esc(D.effect.title)}</b>
         <span>${Utils.esc(D.effect.sub)}</span>
