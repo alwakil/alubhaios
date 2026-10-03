@@ -155,13 +155,18 @@ const Reviews = {
   saveDaily(date, existing) {
     const wrap = qs('#daily-form-wrap', App.container());
     const data = Object.assign({ date: date }, this.collectDaily(wrap));
+    const btn = qs('#daily-save', App.container());
+    if (btn) { btn.disabled = true; btn.innerHTML = `${icon('spinner', 'fa-spin')} Saving…`; }
     API.createDailyReview(data)
       .then(rec => {
         App.replaceRecord('dailyReviews', rec);
         App.refreshCurrent();
         toast(existing ? 'Daily review updated' : 'Daily review saved — nice reflection habit!', 'success');
       })
-      .catch(e => App.handleError(e));
+      .catch(e => {
+        if (btn) { btn.disabled = false; btn.innerHTML = `${icon('check')} ${existing ? "Update today's review" : 'Save daily review'}`; }
+        App.handleError(e);
+      });
   },
 
   openDailyModal(date, existing) {
@@ -348,9 +353,14 @@ const Reviews = {
         next_week_focus: qs('#wr-next', container).value,
         notes: qs('#wr-notes', container).value
       };
+      const btn = qs('#weekly-save', container);
+      if (btn) { btn.disabled = true; btn.innerHTML = `${icon('spinner', 'fa-spin')} Saving…`; }
       API.createWeeklyReview(data)
         .then(rec => { App.replaceRecord('weeklyReviews', rec); App.refreshCurrent(); toast('Weekly review saved', 'success'); })
-        .catch(e => App.handleError(e));
+        .catch(e => {
+          if (btn) { btn.disabled = false; btn.innerHTML = `${icon('check')} ${existing ? 'Update weekly review' : 'Save weekly review'}`; }
+          App.handleError(e);
+        });
     });
 
     const history = (App.state.weeklyReviews || []).slice().sort((a, b) => String(b.week_start).localeCompare(String(a.week_start)));

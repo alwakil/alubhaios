@@ -17,7 +17,8 @@ const Options = {
     difficulties: ['Easy', 'Medium', 'Hard', 'Insane'],
     studyTypes: ['Writeup', 'HTB Module', 'PortSwigger', 'Other'],
     taskCategories: ['Learning', 'Projects', 'Work', 'Personal', 'Entertainment', 'Other'],
-    distractionCategories: ['Entertainment', 'Distraction']
+    distractionCategories: ['Entertainment', 'Distraction'],
+    salahNames: ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
   },
 
   LABELS: {
@@ -26,10 +27,11 @@ const Options = {
     difficulties: 'Difficulty levels',
     studyTypes: 'Study module types',
     taskCategories: 'Task / Goal categories',
-    distractionCategories: 'Distraction categories'
+    distractionCategories: 'Distraction categories',
+    salahNames: 'Salah prayer names'
   },
 
-  GROUP_KEYS: ['platforms', 'ctfCategories', 'difficulties', 'studyTypes', 'taskCategories', 'distractionCategories'],
+  GROUP_KEYS: ['platforms', 'ctfCategories', 'difficulties', 'studyTypes', 'taskCategories', 'distractionCategories', 'salahNames'],
 
   raw() {
     try { return JSON.parse(App.settings.custom_options || '{}') || {}; }

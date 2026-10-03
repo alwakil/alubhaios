@@ -134,6 +134,9 @@ const API = {
   updateChallenge(id, patch) { return this.call('updateChallenge', Object.assign({ id: id }, patch)); },
   deleteChallenge(id) { return this.call('deleteChallenge', { id: id }); },
 
+  /* -------- salah -------- */
+  setSalah(data) { return this.call('setSalah', data); },
+
   /* -------- settings / reset -------- */
   saveSettings(settingsObj) { return this.call('saveSettings', { settings: settingsObj }); },
   archiveOldData(days) { return this.call('archiveOldData', { days: days }); },

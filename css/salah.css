@@ -1,0 +1,75 @@
+/* ============================================================
+   PersonalOS — Salah tracker styles
+   ============================================================ */
+
+.salah-today .salah-bar { margin-bottom: 14px; }
+.salah-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.salah-prayer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 8px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s ease;
+  text-align: center;
+}
+.salah-prayer:hover { border-color: var(--c-success); transform: translateY(-2px); }
+.salah-prayer.done {
+  background: rgba(16, 185, 129, .10);
+  border-color: var(--c-success);
+}
+.sp-check { font-size: 17px; color: var(--text-muted); }
+.salah-prayer.done .sp-check { color: var(--c-success); }
+.sp-name { font-weight: 700; font-size: 13px; }
+.sp-time { font-variant-numeric: tabular-nums; }
+.sp-state { font-size: 10px; color: var(--text-muted); }
+.salah-prayer.done .sp-state { color: var(--c-success); font-weight: 600; }
+
+.salah-complete {
+  text-align: center;
+  font-weight: 700;
+  color: var(--c-success);
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.salah-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: start;
+}
+
+.bt-row.worst { background: color-mix(in srgb, var(--c-danger) 8%, transparent); }
+.bt-row.best { background: color-mix(in srgb, var(--c-success) 10%, transparent); }
+
+.salah-level { margin-top: 14px; }
+
+.salah-setup-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .salah-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .salah-prayer { padding: 10px 4px; }
+  .sp-name { font-size: 11px; }
+  .sp-state { display: none; }
+  .salah-grid-2 { grid-template-columns: 1fr; }
+}

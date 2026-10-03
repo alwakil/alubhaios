@@ -11,6 +11,7 @@ const PAGES = {
   goals:     { title: 'Goals',     render: c => Goals.page(c) },
   routines:  { title: 'Routines',  render: c => Routines.page(c) },
   habits:    { title: 'Habits',    render: c => Habits.page(c) },
+  salah:     { title: 'Salah',     render: c => Salah.page(c) },
   badges:    { title: 'Badges',    render: c => Badges.page(c) },
   focus:     { title: 'Focus',     render: c => Focus.page(c) },
   study:     { title: 'Study',     render: c => Study.page(c) },
@@ -21,7 +22,7 @@ const PAGES = {
 };
 
 const App = {
-  state: { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [] },
+  state: { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [] , salah: [] },
   settings: {},
   current: 'dashboard',
   theme: 'dark',
@@ -62,8 +63,8 @@ const App = {
       try { navigator.serviceWorker.register('sw.js').catch(() => { /* ignore */ }); } catch (e) { /* ignore */ }
     }
 
-    // routine reminders (browser notifications, fire while the app is open)
-    setInterval(() => this.checkRoutineReminders(), 60000);
+    // routine + salah reminders (browser notifications, fire while the app is open)
+    setInterval(() => { this.checkRoutineReminders(); if (window.Salah) Salah.checkReminders(); }, 60000);
 
     this.online = navigator.onLine;
     await this.reload();
@@ -130,7 +131,7 @@ const App = {
     this.setLoading(true, 'Loading dashboard…');
     try {
       if (!API.configured()) {
-        this.state = { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [] };
+        this.state = { tasks: [], goals: [], routines: [], habits: [], habitLogs: [], focusSessions: [], dailyReviews: [], weeklyReviews: [], studyModules: [], challenges: [], salah: [] };
         this.settings = Object.assign({}, CONFIG.DEFAULTS);
         this.backendCurrent = false;
         this.online = false;
@@ -139,7 +140,7 @@ const App = {
         const data = await API.getAll();
         const archived = (data.archivedTasks || []).map(t => Object.assign({}, t, { _archived: true }));
         this.state.tasks = (data.tasks || []).concat(archived);
-        ['goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews', 'studyModules', 'challenges']
+        ['goals', 'routines', 'habits', 'habitLogs', 'focusSessions', 'dailyReviews', 'weeklyReviews', 'studyModules', 'challenges', 'salah']
           .forEach(k => { this.state[k] = data[k] || []; });
         this.settings = Object.assign({}, CONFIG.DEFAULTS, data.settings || {});
         this.backendCurrent = Array.isArray(data.studyModules); // older deploys lack v1.3 sheets

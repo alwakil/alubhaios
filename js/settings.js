@@ -71,6 +71,14 @@ const Settings = {
           </div>
         </div>
 
+        <!-- Salah setup -->
+        <div class="card">
+          <h3 class="card-title">${icon('mosque')} Salah setup</h3>
+          <p class="muted small">Edit the prayer names (any language) and set each prayer's time — the Salah page and its reminders use these.</p>
+          <div id="salah-setup-rows"></div>
+          <button class="btn btn-primary" id="salah-setup-save">${icon('check')} Save names & times</button>
+        </div>
+
         <!-- Notifications -->
         <div class="card">
           <h3 class="card-title">${icon('bell')} Notifications</h3>
@@ -180,6 +188,30 @@ const Settings = {
           btn.innerHTML = `${icon('satellite-dish')} Test connection`;
           App.refreshCurrent();
         });
+    });
+
+    /* --- salah names + times --- */
+    const renderSalahSetup = () => {
+      const names = (() => { try { const n = JSON.parse(App.settings.salah_names || '[]'); if (Array.isArray(n) && n.length === 5) return n; } catch (e) {} return ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']; })();
+      const times = (() => { try { const t = JSON.parse(App.settings.salah_times || '[]'); if (Array.isArray(t)) return t; } catch (e) {} return ['', '', '', '', '']; })();
+      const wrap = qs('#salah-setup-rows', container);
+      wrap.innerHTML = [0, 1, 2, 3, 4].map(i => `
+        <div class="salah-setup-row">
+          <input data-salah-name="${i}" value="${Utils.esc(names[i] || '')}" placeholder="Prayer name ${i + 1}" maxlength="30">
+          <input data-salah-time="${i}" type="time" value="${Utils.esc(times[i] || '')}">
+        </div>`).join('');
+    };
+    renderSalahSetup();
+    qs('#salah-setup-save', container).addEventListener('click', async () => {
+      const defaults = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const names = [0, 1, 2, 3, 4].map(i => qs(`[data-salah-name="${i}"]`, container).value.trim() || defaults[i]);
+      const times = [0, 1, 2, 3, 4].map(i => qs(`[data-salah-time="${i}"]`, container).value || '');
+      try {
+        await API.saveSettings({ salah_names: JSON.stringify(names), salah_times: JSON.stringify(times) });
+        App.settings.salah_names = JSON.stringify(names);
+        App.settings.salah_times = JSON.stringify(times);
+        toast('🕌 Salah names & times saved — reminders will use them.', 'success');
+      } catch (e) { App.handleError(e); }
     });
 
     /* --- custom options manager --- */

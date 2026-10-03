@@ -13,14 +13,13 @@
   <link rel="stylesheet" href="assets/vendor/fonts/inter.css">
   <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
   <script src="assets/vendor/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=1.5.4">
-  <link rel="stylesheet" href="css/dashboard.css?v=1.5.4">
-  <link rel="stylesheet" href="css/fishbone.css?v=1.5.4">
-  <link rel="stylesheet" href="css/gamify.css?v=1.5.4">
-  <link rel="stylesheet" href="css/study.css?v=1.5.4">
-  <link rel="stylesheet" href="css/gamify.css?v=1.5.4">
-  <link rel="stylesheet" href="css/study.css?v=1.5.4">
-  <link rel="stylesheet" href="css/responsive.css?v=1.5.4">
+  <link rel="stylesheet" href="css/style.css?v=1.6.0">
+  <link rel="stylesheet" href="css/dashboard.css?v=1.6.0">
+  <link rel="stylesheet" href="css/fishbone.css?v=1.6.0">
+  <link rel="stylesheet" href="css/gamify.css?v=1.6.0">
+  <link rel="stylesheet" href="css/study.css?v=1.6.0">
+  <link rel="stylesheet" href="css/salah.css?v=1.6.0">
+  <link rel="stylesheet" href="css/responsive.css?v=1.6.0">
 </head>
 <body>
 
@@ -82,6 +81,7 @@
       <section class="page" id="page-study" hidden></section>
       <section class="page" id="page-badges" hidden></section>
       <section class="page" id="page-routines" hidden></section>
+      <section class="page" id="page-salah" hidden></section>
       <section class="page" id="page-habits" hidden></section>
       <section class="page" id="page-focus" hidden></section>
       <section class="page" id="page-analytics" hidden></section>
@@ -109,24 +109,25 @@
   <div id="modal-root"></div>
   <div id="toast-root"></div>
 
-  <script src="js/config.js?v=1.5.4"></script>
-  <script src="js/options.js?v=1.5.4"></script>
-  <script src="js/utils.js?v=1.5.4"></script>
-  <script src="js/api.js?v=1.5.4"></script>
-  <script src="js/analytics.js?v=1.5.4"></script>
-  <script src="js/dashboard.js?v=1.5.4"></script>
-  <script src="js/tasks.js?v=1.5.4"></script>
-  <script src="js/goals.js?v=1.5.4"></script>
-  <script src="js/routines.js?v=1.5.4"></script>
-  <script src="js/habits.js?v=1.5.4"></script>
-  <script src="js/study.js?v=1.5.4"></script>
-  <script src="js/fishbone.js?v=1.5.4"></script>
-  <script src="js/gamify.js?v=1.5.4"></script>
-  <script src="js/badges.js?v=1.5.4"></script>
-  <script src="js/focus.js?v=1.5.4"></script>
-  <script src="js/reviews.js?v=1.5.4"></script>
-  <script src="js/settings.js?v=1.5.4"></script>
-  <script src="js/app.js?v=1.5.4"></script>
+  <script src="js/config.js?v=1.6.0"></script>
+  <script src="js/options.js?v=1.6.0"></script>
+  <script src="js/utils.js?v=1.6.0"></script>
+  <script src="js/api.js?v=1.6.0"></script>
+  <script src="js/analytics.js?v=1.6.0"></script>
+  <script src="js/dashboard.js?v=1.6.0"></script>
+  <script src="js/tasks.js?v=1.6.0"></script>
+  <script src="js/goals.js?v=1.6.0"></script>
+  <script src="js/routines.js?v=1.6.0"></script>
+  <script src="js/habits.js?v=1.6.0"></script>
+  <script src="js/salah.js?v=1.6.0"></script>
+  <script src="js/study.js?v=1.6.0"></script>
+  <script src="js/fishbone.js?v=1.6.0"></script>
+  <script src="js/gamify.js?v=1.6.0"></script>
+  <script src="js/badges.js?v=1.6.0"></script>
+  <script src="js/focus.js?v=1.6.0"></script>
+  <script src="js/reviews.js?v=1.6.0"></script>
+  <script src="js/settings.js?v=1.6.0"></script>
+  <script src="js/app.js?v=1.6.0"></script>
   <script>
     // build the sidebar navigation (keeps HTML small, single source of truth)
     (function () {
@@ -138,6 +139,7 @@
         ['study', 'graduation-cap', 'Study'],
         ['routines', 'clock', 'Routines'],
         ['habits', 'fire', 'Habits'],
+        ['salah', 'mosque', 'Salah'],
         ['badges', 'trophy', 'Badges'],
         ['focus', 'stopwatch', 'Focus'],
         ['analytics', 'chart-line', 'Analytics'],

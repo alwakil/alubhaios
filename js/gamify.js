@@ -24,6 +24,13 @@ const Gamify = {
     const daily = (s.dailyReviews || []).length;
     const weekly = (s.weeklyReviews || []).length;
     const ctf = (s.challenges || []).filter(c => c.status === 'solved').length;
+    let salahPrayers = 0, salahFullDays = 0;
+    (s.salah || []).forEach(r => {
+      let n = 0;
+      ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].forEach(k => { if (r[k] === true || String(r[k]).toLowerCase() === 'true') n++; });
+      salahPrayers += n;
+      if (n === 5) salahFullDays++;
+    });
     return {
       tasks: tasks * 10,
       habits: habits * 5,
@@ -31,13 +38,14 @@ const Gamify = {
       dailyReviews: daily * 15,
       weeklyReviews: weekly * 25,
       ctf: ctf * 15,
+      salah: salahPrayers * 2 + salahFullDays * 5,
       _counts: { tasks, habits, focusMin, daily, weekly, ctf }
     };
   },
 
   xp() {
     const b = this.xpBreakdown();
-    return b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf;
+    return b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf + b.salah;
   },
 
   level(xp) {

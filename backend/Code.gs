@@ -46,6 +46,8 @@ var SCHEMA = {
                  'link', 'notes', 'created_at', 'updated_at'],
   Challenges: ['id', 'name', 'platform', 'category', 'difficulty', 'status',
                'link', 'solved_date', 'notes', 'created_at', 'updated_at'],
+  Salah: ['id', 'date', 'fajr', 'dhuhr', 'asr', 'maghrib', 'isha',
+          'created_at', 'updated_at'],
   Settings: ['key', 'value']
 };
 
@@ -163,6 +165,7 @@ function getAllData_() {
     weeklyReviews: list_('WeeklyReviews'),
     studyModules: list_('StudyModules'),
     challenges: list_('Challenges'),
+    salah: list_('Salah'),
     settings: getSettings_(),
     serverTime: nowIso_()
   };
@@ -385,6 +388,20 @@ function writeAction_(action, data) {
       requireId_(data.id, 'challenge');
       deleteRecord_('Challenges', data.id);
       return ok_('Challenge deleted', { id: data.id });
+
+    /* ---------------- Salah (5 daily prayers, one row per date) -------- */
+    case 'setSalah': {
+      requireText_(data.date, 'Date');
+      var date = String(data.date).slice(0, 10);
+      var prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+      var existing = list_('Salah').filter(function (r) { return String(r.date).slice(0, 10) === date; });
+      var patch = { date: date };
+      // only update the keys the caller sent — never wipe the others
+      prayers.forEach(function (pr) { if (data[pr] !== undefined) patch[pr] = isTrue_(data[pr]); });
+      var rec = existing.length ? updateRecord_('Salah', existing[0].id, patch)
+                                : createRecord_('Salah', patch);
+      return ok_('Salah saved for ' + date, rec);
+    }
 
     /* ---------------- Settings ---------------- */
     case 'saveSettings':
