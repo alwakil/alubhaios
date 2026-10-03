@@ -5,12 +5,20 @@
 'use strict';
 
 const GoalProgress = {
-  /** Progress shown = manual field, or auto % from linked tasks when one exists. */
+  /** Path B: the manual progress field ALWAYS wins on display. Task stats
+      are still computed (shown under the bar); ↻ sync copies them into the
+      manual field. */
   auto(goal) {
     const tasks = (App.state.tasks || []).filter(t => t.goal_id === goal.id);
-    if (!tasks.length) return { pct: Utils.num(goal.progress), from: 'manual', completed: 0, remaining: 0 };
     const done = tasks.filter(t => t.status === 'completed').length;
-    return { pct: Utils.pct(done, tasks.length), from: 'tasks', completed: done, remaining: tasks.length - done };
+    const pct = Utils.clamp(Utils.num(goal.progress), 0, 100);
+    return {
+      pct: pct,
+      from: 'manual',
+      hasTasks: tasks.length > 0,
+      completed: done,
+      remaining: tasks.length - done
+    };
   }
 };
 
@@ -92,9 +100,9 @@ const Goals = {
             <b class="goal-pct">${prog.pct}%</b>
           </div>
           <div class="muted goal-stats">
-            ${prog.from === 'tasks'
-              ? `Completed: ${prog.completed} · Remaining: ${prog.remaining} (auto from tasks)`
-              : `Manual progress · ${prog.completed ? '' : 'link tasks to auto-track'}`}
+            ${prog.hasTasks
+              ? `Tasks: ${prog.completed} completed · ${prog.remaining} remaining · ${icon('rotate', 'fa-xs')} sync sets % from tasks`
+              : `Manual progress — set it with ${icon('pencil', 'fa-xs')} edit`}
           </div>
         </div>
         ${children.map(c => this.goalCard(c, depth + 1)).join('')}
@@ -178,7 +186,7 @@ const Goals = {
       const rec = await API.updateGoal(goal.id, { progress: pct });
       App.replaceRecord('goals', rec);
       App.refreshCurrent();
-      toast(`Progress synced to ${pct}%`, 'success');
+      toast(`Progress set to ${pct}% (from linked tasks)`, 'success');
     } catch (e) { App.handleError(e); }
   },
 

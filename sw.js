@@ -7,7 +7,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'alubhaios-v2.1.0';
+const CACHE = 'alubhaios-v2.1.1';
 const CORE = [
   'index.html',
   'manifest.webmanifest',
