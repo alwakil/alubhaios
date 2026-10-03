@@ -272,8 +272,17 @@ const App = {
 
   handleError(e) {
     console.error(e);
-    toast(e.message || 'Something went wrong.', 'error');
-    if (e.code === 'NETWORK') this.showError(e.message);
+    const msg = String((e && e.message) || '');
+    // "Unknown action" = the deployed backend predates a feature (Study/CTF/Salah/Archive)
+    if (msg.includes('Unknown action')) {
+      Utils.pref('upgradeDismissed', false);
+      this.backendCurrent = false;
+      this.updateUpgradeBanner();
+      toast('This feature needs the backend update — see the yellow banner at the top for the 3 steps.', 'warn');
+      return;
+    }
+    toast(msg || 'Something went wrong.', 'error');
+    if (e.code === 'NETWORK') this.showError(msg);
   }
 };
 window.App = App;
