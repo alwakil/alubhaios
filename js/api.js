@@ -35,6 +35,11 @@ const SB_CONFLICT = {
   weekly_reviews: ['week_start']
 };
 
+/* tables that HAVE a created_at column — focus_sessions, daily_reviews,
+   weekly_reviews and settings don't (must never send it there: PGRST204) */
+const SB_HAS_CREATED = ['tasks', 'archive', 'goals', 'routines', 'habits',
+  'habit_logs', 'study_modules', 'challenges', 'salah'];
+
 const API = {
   url() {
     const stored = Utils.pref('sbUrl');
@@ -232,7 +237,7 @@ const API = {
     const existing = await this.rest('daily_reviews', { method: 'GET', qs: '?date=eq.' + encodeURIComponent(data.date) + '&select=*' });
     if (Array.isArray(existing) && existing.length) return this.patch('daily_reviews', existing[0].id, data);
     if (!data.id) data.id = Utils.uid();
-    if (!data.created_at) data.created_at = Utils.nowISO();
+    // NOTE: daily_reviews has NO created_at column — sending one → PGRST204
     const rows = await this.upsert('daily_reviews', data);
     return Array.isArray(rows) ? rows[0] : rows;
   },
@@ -332,7 +337,9 @@ const API = {
     rec = Object.assign({}, rec);
     if (!rec.id) rec.id = Utils.uid();
     const now = Utils.nowISO();
-    if (!rec.created_at) rec.created_at = now;
+    // only stamp created_at for tables that HAVE the column (focus_sessions,
+    // daily_reviews, weekly_reviews, settings don't — sending it → PGRST204)
+    if (SB_HAS_CREATED.includes(table) && !rec.created_at) rec.created_at = now;
     if ('updated_at' in rec && !rec.updated_at) rec.updated_at = now;
     const rows = await this.upsert(table, rec);
     const row = Array.isArray(rows) ? rows[0] : rows;
