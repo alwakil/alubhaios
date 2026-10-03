@@ -124,6 +124,7 @@ const Focus = {
     if (!t || !t.running) return;
     t.accumulatedMs += Date.now() - t.startedAt;
     t.running = false; t.startedAt = null;
+    t.pausedAt = Date.now(); // pause→distraction (A): remember when the break began
     this.save();
     App.refreshCurrent();
   },
@@ -131,10 +132,38 @@ const Focus = {
   resume() {
     const t = this.timer;
     if (!t || t.running) return;
-    t.startedAt = Date.now();
+    const now = Date.now();
+    this._logPauseAsDistraction(t.pausedAt, now);
+    t.pausedAt = null;
+    t.startedAt = now;
     t.running = true;
     this.save();
     App.refreshCurrent();
+  },
+
+  /** Pause→distraction (variant A): a pause of ≥1 min is logged as its own
+      Distraction session when the timer resumes. Pauses longer than 3 hours
+      are treated as abandoned (not a break) and skipped. Fire-and-forget —
+      never blocks the resume itself. */
+  _logPauseAsDistraction(pausedAt, resumedAt) {
+    if (!pausedAt) return;
+    const minutes = Math.floor((resumedAt - pausedAt) / 60000);
+    if (minutes < 1) return;
+    if (minutes > 180) return; // overnight/abandoned — not a "pause"
+    API.createFocusSession({
+      task_id: '', category: 'Distraction',
+      start_time: this.epochISO(pausedAt),
+      end_time: this.epochISO(resumedAt),
+      duration_minutes: minutes,
+      focus_rating: '',
+      interruptions: 0,
+      notes: '[auto] paused during a focus session'
+    })
+      .then(rec => {
+        App.replaceRecord('focusSessions', rec);
+        toast(`⏸ Pause logged as distraction (${Utils.fmtMinutes(minutes)}).`, 'info');
+      })
+      .catch(() => { /* silent — resume must never fail because of this */ });
   },
 
   stop() { if (this.timer) this.openSaveModal(); },
@@ -172,6 +201,7 @@ const Focus = {
     if (!t || !t.running) return;
     t.remainingMs = Math.max(0, t.endsAt - Date.now());
     t.running = false;
+    t.pausedAt = Date.now(); // pause→distraction (A)
     this.savePomo();
     App.refreshCurrent();
   },
@@ -179,7 +209,10 @@ const Focus = {
   pomoResume() {
     const t = this.pomo;
     if (!t || t.running) return;
-    t.endsAt = Date.now() + (t.remainingMs || 0);
+    const now = Date.now();
+    this._logPauseAsDistraction(t.pausedAt, now);
+    t.pausedAt = null;
+    t.endsAt = now + (t.remainingMs || 0);
     t.running = true;
     this.savePomo();
     App.refreshCurrent();
