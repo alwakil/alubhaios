@@ -34,6 +34,18 @@
 .level-mini .progress-fill { background: var(--c-primary); }
 .level-mini .muted { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+/* missed-work XP penalty */
+.penalty-mini {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--c-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+.penalty-mini a { color: var(--c-danger); font-weight: 700; }
+.penalty-note { color: var(--c-danger); font-weight: 600; }
+
 .level-card { margin-bottom: 14px; }
 .level-row { display: flex; align-items: center; gap: 16px; }
 .level-num {

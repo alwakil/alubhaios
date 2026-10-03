@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — App shell
+   AluBhaiOS — App shell
    State, hash router, data loading, theme, search, error handling.
    ============================================================ */
 'use strict';

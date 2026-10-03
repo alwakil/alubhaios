@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Service Worker (PWA)
+   AluBhaiOS — Service Worker (PWA)
    Static files: cache-first (each release uses new ?v= URLs, so a
    new deploy is always fetched fresh). Page navigation: network-first
    with cache fallback (offline still opens the app). The Google
@@ -7,7 +7,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'personalos-v1.6.1';
+const CACHE = 'alubhaios-v2.0.0';
 const CORE = [
   'index.html',
   'manifest.webmanifest',

@@ -1,12 +1,12 @@
 /* ============================================================
-   PersonalOS — Fishbone (Ishikawa) diagram
+   AluBhaiOS — Fishbone (Ishikawa) diagram
    "Factors that Really Hamper Your Cybersecurity Learning Consistency"
 
    Fully drawn in SVG (no image): the spine draws itself, the eight
    bones unfold, causes slide in, dots flow toward the problem.
    Interactive: hover a category to spotlight it, click a header to
    fold its causes, mark causes solved (persisted in Settings), and
-   turn any cause into a real PersonalOS task with one click.
+   turn any cause into a real AluBhaiOS task with one click.
    ============================================================ */
 'use strict';
 
@@ -90,7 +90,7 @@ const FISHBONE_DATA = {
   takeaway: 'Most of these factors are solvable. Awareness is the first step. Focus on a few high-impact areas — time management, structured learning, reducing distractions and a stable setup — to build consistent progress.',
   quotes: [
     { text: 'Identify the real causes, so you can fix them and move forward with consistency.', by: 'A more focused and stronger you' },
-    { text: 'Consistency beats intensity. Small steps every day lead to big results.', by: 'PersonalOS' }
+    { text: 'Consistency beats intensity. Small steps every day lead to big results.', by: 'AluBhaiOS' }
   ]
 };
 

@@ -1,6 +1,6 @@
 {
-  "name": "PersonalOS — Productivity OS",
-  "short_name": "PersonalOS",
+  "name": "AluBhaiOS — Productivity OS",
+  "short_name": "AluBhaiOS",
   "description": "Plan, execute, measure, reflect, improve — your personal productivity operating system.",
   "start_url": "./index.html",
   "scope": "./",

@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Custom options engine
+   AluBhaiOS — Custom options engine
    Every dropdown's options can be managed from Settings →
    "Custom options". Model per group:
      { added: [...user additions], hidden: [...removed defaults] }

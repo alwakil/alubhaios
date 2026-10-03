@@ -1,19 +1,22 @@
 /* ============================================================
-   PersonalOS — Configuration
+   AluBhaiOS — Configuration
    The ONLY file you normally need to edit to connect your backend.
-   Never put a spreadsheet ID here — the spreadsheet is only ever
-   touched by the Google Apps Script Web App (see /backend/Code.gs).
+   Backend: Supabase (free) — Project URL + anon public key from
+   Supabase Dashboard → Settings → API.
+   Never put the service_role key here — only the anon key is safe
+   for a public frontend.
    ============================================================ */
 'use strict';
 
 const CONFIG = {
-  // Your Google Apps Script Web App URL (permanent default for this app).
-  // Any value saved later in Settings → Backend connection OVERRIDES this
-  // (stored per browser); leave the Settings field empty to use this one.
-  API_URL: "https://script.google.com/macros/s/AKfycbxsgyuxYIhF3OVV36Y9thznNJJMNIRRCShlbeQnA-4nX33IFJFRNwC84fLInqeStkJk/exec",
+  // Your Supabase project settings (permanent defaults for this app).
+  // Values saved later in Settings → Backend connection OVERRIDE these
+  // (stored per browser); leave the Settings fields empty to use these.
+  SUPABASE_URL: "YOUR_SUPABASE_PROJECT_URL",
+  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY",
 
-  APP_NAME: "PersonalOS",
-  VERSION: "1.0.0",
+  APP_NAME: "AluBhaiOS",
+  VERSION: "2.0.0",
 
   CATEGORIES: ["Learning", "Projects", "Work", "Personal", "Entertainment", "Other"],
   // Sessions in these categories count as "distraction time", not focus time.

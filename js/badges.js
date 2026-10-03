@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Badges
+   AluBhaiOS — Badges
    Every badge is computed from the REAL records (tasks, focus
    sessions, habit logs, reviews, goals, XP). Locked badges show
    live progress; tiers: bronze / silver / gold.
@@ -98,6 +98,15 @@ const Badges = {
         </div>
         <div class="muted small xp-legend">
           +10 task · +5 habit · +1 XP / 3 min focus · +15 daily review · +25 weekly review
+          ${(() => {
+            const p = Gamify.penalty();
+            if (!p.total) return ' · <span style="color:var(--c-green,#10b981)">no missed-work penalty ✓</span>';
+            const parts = [];
+            if (p.task) parts.push(p.task + ' task' + (p.task > 1 ? 's' : ''));
+            if (p.habit) parts.push(p.habit + ' habit' + (p.habit > 1 ? 's' : ''));
+            if (p.salah) parts.push(p.salah + ' salat');
+            return ` · <span class="penalty-note">−${p.total} XP missed (${Utils.esc(parts.join(', '))})</span>`;
+          })()}
         </div>
       </div>
 

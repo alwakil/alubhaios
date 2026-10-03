@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PersonalOS</title>
-  <meta name="description" content="PersonalOS — a personal productivity operating system: plan, execute, measure, reflect, improve.">
+  <title>AluBhaiOS</title>
+  <meta name="description" content="AluBhaiOS — a personal productivity operating system: plan, execute, measure, reflect, improve.">
   <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -13,13 +13,13 @@
   <link rel="stylesheet" href="assets/vendor/fonts/inter.css">
   <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
   <script src="assets/vendor/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=1.6.1">
-  <link rel="stylesheet" href="css/dashboard.css?v=1.6.1">
-  <link rel="stylesheet" href="css/fishbone.css?v=1.6.1">
-  <link rel="stylesheet" href="css/gamify.css?v=1.6.1">
-  <link rel="stylesheet" href="css/study.css?v=1.6.1">
-  <link rel="stylesheet" href="css/salah.css?v=1.6.1">
-  <link rel="stylesheet" href="css/responsive.css?v=1.6.1">
+  <link rel="stylesheet" href="css/style.css?v=2.0.0">
+  <link rel="stylesheet" href="css/dashboard.css?v=2.0.0">
+  <link rel="stylesheet" href="css/fishbone.css?v=2.0.0">
+  <link rel="stylesheet" href="css/gamify.css?v=2.0.0">
+  <link rel="stylesheet" href="css/study.css?v=2.0.0">
+  <link rel="stylesheet" href="css/salah.css?v=2.0.0">
+  <link rel="stylesheet" href="css/responsive.css?v=2.0.0">
 </head>
 <body>
 
@@ -28,7 +28,7 @@
   <aside id="sidebar">
     <div class="brand">
       <img src="assets/icons/favicon.svg" alt="" width="30" height="30">
-      <span>Personal<b>OS</b></span>
+      <span>AluBhai<b>OS</b></span>
     </div>
     <nav id="nav-list">
       <!-- populated by the inline script at the bottom of <body> -->
@@ -53,7 +53,7 @@
 
     <div id="setup-banner" class="banner banner-info" hidden>
       <i class="fa-solid fa-plug-circle-exclamation"></i>
-      <span>Backend not configured yet. Connect your Google Apps Script Web App URL to load and save your data.</span>
+      <span>Backend not configured yet. Connect your Supabase Project URL + anon key in Settings to load and save your data.</span>
       <a class="btn btn-sm btn-primary" href="#/settings" onclick="Utils.pref('setupDismissed', true)">Open Settings</a>
       <button class="btn btn-icon btn-ghost" onclick="Utils.pref('setupDismissed', true); document.getElementById('setup-banner').hidden = true" title="Dismiss"><i class="fa-solid fa-xmark"></i></button>
     </div>
@@ -109,25 +109,25 @@
   <div id="modal-root"></div>
   <div id="toast-root"></div>
 
-  <script src="js/config.js?v=1.6.1"></script>
-  <script src="js/options.js?v=1.6.1"></script>
-  <script src="js/utils.js?v=1.6.1"></script>
-  <script src="js/api.js?v=1.6.1"></script>
-  <script src="js/analytics.js?v=1.6.1"></script>
-  <script src="js/dashboard.js?v=1.6.1"></script>
-  <script src="js/tasks.js?v=1.6.1"></script>
-  <script src="js/goals.js?v=1.6.1"></script>
-  <script src="js/routines.js?v=1.6.1"></script>
-  <script src="js/habits.js?v=1.6.1"></script>
-  <script src="js/salah.js?v=1.6.1"></script>
-  <script src="js/study.js?v=1.6.1"></script>
-  <script src="js/fishbone.js?v=1.6.1"></script>
-  <script src="js/gamify.js?v=1.6.1"></script>
-  <script src="js/badges.js?v=1.6.1"></script>
-  <script src="js/focus.js?v=1.6.1"></script>
-  <script src="js/reviews.js?v=1.6.1"></script>
-  <script src="js/settings.js?v=1.6.1"></script>
-  <script src="js/app.js?v=1.6.1"></script>
+  <script src="js/config.js?v=2.0.0"></script>
+  <script src="js/options.js?v=2.0.0"></script>
+  <script src="js/utils.js?v=2.0.0"></script>
+  <script src="js/api.js?v=2.0.0"></script>
+  <script src="js/analytics.js?v=2.0.0"></script>
+  <script src="js/dashboard.js?v=2.0.0"></script>
+  <script src="js/tasks.js?v=2.0.0"></script>
+  <script src="js/goals.js?v=2.0.0"></script>
+  <script src="js/routines.js?v=2.0.0"></script>
+  <script src="js/habits.js?v=2.0.0"></script>
+  <script src="js/salah.js?v=2.0.0"></script>
+  <script src="js/study.js?v=2.0.0"></script>
+  <script src="js/fishbone.js?v=2.0.0"></script>
+  <script src="js/gamify.js?v=2.0.0"></script>
+  <script src="js/badges.js?v=2.0.0"></script>
+  <script src="js/focus.js?v=2.0.0"></script>
+  <script src="js/reviews.js?v=2.0.0"></script>
+  <script src="js/settings.js?v=2.0.0"></script>
+  <script src="js/app.js?v=2.0.0"></script>
   <script>
     // build the sidebar navigation (keeps HTML small, single source of truth)
     (function () {

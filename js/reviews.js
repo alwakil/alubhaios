@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Reviews (daily + weekly)
+   AluBhaiOS — Reviews (daily + weekly)
    Daily:  energy / focus / motivation / stress + summary of the day
    Weekly: auto-computed stats + biggest win / problem / next focus
    Both upsert by their natural key (date / week_start) on the backend.

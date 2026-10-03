@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Analytics engine + Chart.js helper
+   AluBhaiOS — Analytics engine + Chart.js helper
    Everything here is computed from the real records cached in
    App.state (tasks, focusSessions, habitLogs, habits, goals).
    Nothing is faked: when there is not enough data, insights say so.

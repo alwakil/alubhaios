@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Settings
+   AluBhaiOS — Settings
    Profile, appearance, backend connection and the DATA SAFETY /
    RESET system. Destructive actions are clearly separated and
    guarded (typed "RESET" confirmation where required).
@@ -46,14 +46,16 @@ const Settings = {
               ${API.configured() ? (App.online ? 'Connected' : 'Not connected') : 'Not configured'}
             </span>
           </p>
-          <label class="field"><span>Google Apps Script Web App URL</span>
-            <input id="set-api-url" value="${Utils.esc(apiUrl === String(CONFIG.API_URL) ? '' : apiUrl)}" placeholder="Paste your /exec URL here (overrides js/config.js)"></label>
+          <label class="field"><span>Supabase Project URL</span>
+            <input id="set-api-url" value="${Utils.esc(apiUrl === String(CONFIG.SUPABASE_URL) ? '' : apiUrl)}" placeholder="https://xxxx.supabase.co (overrides js/config.js)"></label>
+          <label class="field"><span>Supabase anon key (public)</span>
+            <input id="set-api-key" value="${Utils.esc(API.key() === String(CONFIG.SUPABASE_ANON_KEY) ? '' : API.key())}" placeholder="eyJhbGciOi… (anon public key only)"></label>
           <div class="form-actions">
-            <button class="btn" id="set-api-save">${icon('floppy-disk')} Save URL</button>
+            <button class="btn" id="set-api-save">${icon('floppy-disk')} Save connection</button>
             <button class="btn" id="set-api-test">${icon('satellite-dish')} Test connection</button>
             <button class="btn btn-ghost" id="set-api-clear">Clear override</button>
           </div>
-          <p class="muted small">Full setup guide: see the repository README (Google Sheet → Apps Script → deploy Web App).</p>
+          <p class="muted small">Supabase Dashboard → Settings → API → copy "Project URL" + "anon public" key. Full guide: repository README.</p>
         </div>
 
         <!-- Custom options -->
@@ -92,7 +94,7 @@ const Settings = {
           <h3 class="card-title">${icon('circle-info')} About</h3>
           <p class="small">${Utils.esc(CONFIG.APP_NAME)} v${Utils.esc(CONFIG.VERSION)} — a personal productivity operating system:
             Plan → Execute → Measure → Reflect → Improve.</p>
-          <p class="muted small">Frontend: GitHub Pages · Backend: Google Apps Script · Database: Google Sheets · Charts: Chart.js</p>
+          <p class="muted small">Frontend: GitHub Pages · Backend: Supabase (Postgres REST) · Charts: Chart.js</p>
           <p class="muted small" id="pwa-hint"></p>
         </div>
       </div>
@@ -132,7 +134,7 @@ const Settings = {
         <div class="danger-row last" style="border-top:1px solid var(--border)">
           <div>
             <b>${icon('box-archive')} Archive old tasks</b>
-            <p class="muted small">Moves completed tasks older than the threshold into an "Archive" sheet in your spreadsheet. Nothing is deleted — history and stats stay intact.</p>
+            <p class="muted small">Moves completed tasks older than the threshold into the "archive" table in your Supabase database. Nothing is deleted — history and stats stay intact.</p>
             <div class="field-row" style="max-width:260px;margin-top:8px">
               <label class="field"><span>Older than (days)</span>
                 <input type="number" id="archive-days" min="30" step="10" value="120"></label>
@@ -164,16 +166,19 @@ const Settings = {
     /* --- backend --- */
     qs('#set-api-save', container).addEventListener('click', () => {
       const v = qs('#set-api-url', container).value.trim();
-      if (v && !/^https?:\/\//.test(v)) {
-        return toast('Please paste a full URL starting with http:// or https:// (the Apps Script /exec URL).', 'warn');
+      const k = qs('#set-api-key', container).value.trim();
+      if (v && !/^https:\/\/.+/.test(v)) {
+        return toast('Please paste a full Supabase URL starting with https:// (example: https://xxxx.supabase.co).', 'warn');
       }
-      Utils.pref('apiUrl', v);
-      toast(v ? 'API URL saved — testing…' : 'Override cleared.', 'info');
+      Utils.pref('sbUrl', v);
+      Utils.pref('sbKey', k);
+      toast(v || k ? 'Connection saved — testing…' : 'Override cleared.', 'info');
       App.reload();
     });
     qs('#set-api-clear', container).addEventListener('click', () => {
-      Utils.pref('apiUrl', '');
-      toast('Override cleared — using js/config.js value.', 'info');
+      Utils.pref('sbUrl', '');
+      Utils.pref('sbKey', '');
+      toast('Override cleared — using js/config.js values.', 'info');
       App.reload();
     });
     qs('#set-api-test', container).addEventListener('click', () => {
@@ -181,7 +186,7 @@ const Settings = {
       btn.disabled = true;
       btn.innerHTML = `${icon('spinner', 'fa-spin')} Testing…`;
       API.ping()
-        .then(res => toast(`Connected to "${(res && res.spreadsheet) || 'backend'}" ✓`, 'success'))
+        .then(() => toast('Connected to Supabase ✓', 'success'))
         .catch(e => toast(e.message, 'error'))
         .finally(() => {
           btn.disabled = false;
@@ -263,7 +268,7 @@ const Settings = {
       const standalone = window.matchMedia('(display-mode: standalone)').matches;
       pwa.innerHTML = standalone
         ? `${icon('mobile-screen')} Running as an installed app. Enjoy! 🎉`
-        : `${icon('mobile-screen')} Install tip: browser menu → "Install PersonalOS" / "Add to Home screen" for the full-screen app experience.`;
+        : `${icon('mobile-screen')} Install tip: browser menu → "Install AluBhaiOS" / "Add to Home screen" for the full-screen app experience.`;
     }
 
     /* --- archive --- */

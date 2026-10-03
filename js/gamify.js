@@ -10,6 +10,12 @@
    Streak freezes: hold max 2; earn one per 7-day habit streak
    milestone (min 3 days between awards). Consumed explicitly to
    keep a streak alive (logged as a freeze check-in).
+   Penalty (missed work cuts XP, capped, never below 0):
+     task missed (past scheduled_date, still not done)   −5
+     habit not checked on a past day                      −2
+     salat not marked on a past day                       −2
+   Only days AFTER the feature start (settings key "penalty_since")
+   count, today never counts, max −15 per day.
    ============================================================ */
 'use strict';
 
@@ -39,13 +45,80 @@ const Gamify = {
       weeklyReviews: weekly * 25,
       ctf: ctf * 15,
       salah: salahPrayers * 2 + salahFullDays * 5,
+      penalty: this.penalty().total,
       _counts: { tasks, habits, focusMin, daily, weekly, ctf }
     };
   },
 
+  /* ---------------- missed-work penalty ---------------- */
+
+  PENALTIES: { task: 5, habit: 2, salah: 2, perDayCap: 15 },
+
+  /** First day the penalty system is active (set once, stored in Settings). */
+  penaltySince() {
+    let since = String(App.settings.penalty_since || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+      since = Utils.today(); // feature activation day — no retroactive cuts
+      App.settings.penalty_since = since;
+      API.saveSettings({ penalty_since: since }).catch(() => {});
+    }
+    return since;
+  },
+
+  /** Missed items per past day since activation. Detailed, so UI can show counts. */
+  penalty() {
+    const since = this.penaltySince();
+    const today = Utils.today();
+    const P = this.PENALTIES;
+    const out = { task: 0, habit: 0, salah: 0, total: 0, days: 0 };
+
+    // every distinct past date in the data (so empty stretches cost nothing)
+    const dates = new Set();
+    (App.state.habitLogs || []).forEach(l => { const d = String(l.date).slice(0, 10); if (d >= since && d < today) dates.add(d); });
+    (App.state.salah || []).forEach(r => { const d = String(r.date).slice(0, 10); if (d >= since && d < today) dates.add(d); });
+    (App.state.tasks || []).forEach(t => {
+      if (t._archived) return;
+      const d = String(t.scheduled_date || '').slice(0, 10);
+      if (d && d >= since && d < today) dates.add(d);
+    });
+
+    const enabledHabits = (App.state.habits || []).filter(h => h.enabled !== false);
+
+    dates.forEach(date => {
+      let dayPenalty = 0;
+      // missed tasks: scheduled that past day, still not completed
+      const missedTasks = (App.state.tasks || []).filter(t =>
+        !t._archived && t.status !== 'completed' && String(t.scheduled_date || '').slice(0, 10) === date).length;
+      // missed habits: enabled habit with no real completed check-in that day
+      const doneHabits = new Set((App.state.habitLogs || []).filter(l =>
+        String(l.date).slice(0, 10) === date &&
+        (l.completed === true || String(l.completed).toLowerCase() === 'true') &&
+        !/❄|freeze/i.test(String(l.note || ''))).map(l => l.habit_id));
+      const missedHabits = enabledHabits.filter(h => !doneHabits.has(h.id)).length;
+      // missed salat: prayer not marked on that past day
+      let missedSalah = 0;
+      (App.state.salah || []).forEach(r => {
+        if (String(r.date).slice(0, 10) !== date) return;
+        ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].forEach(k => {
+          if (!(r[k] === true || String(r[k]).toLowerCase() === 'true')) missedSalah++;
+        });
+      });
+
+      dayPenalty = Math.min(P.perDayCap,
+        missedTasks * P.task + missedHabits * P.habit + missedSalah * P.salah);
+      out.days++;
+      out.task += missedTasks;
+      out.habit += missedHabits;
+      out.salah += missedSalah;
+      out.total += dayPenalty;
+    });
+
+    return out;
+  },
+
   xp() {
     const b = this.xpBreakdown();
-    return b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf + b.salah;
+    return Math.max(0, b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf + b.salah - b.penalty);
   },
 
   level(xp) {

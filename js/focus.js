@@ -1,5 +1,5 @@
 /* ============================================================
-   PersonalOS — Focus timer
+   AluBhaiOS — Focus timer
    Two modes:
    • Stopwatch — free-running session, start / pause / resume / stop
    • Pomodoro  — focus → break cycles with countdown, notifications,

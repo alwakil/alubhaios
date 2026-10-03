@@ -41,7 +41,9 @@ const Dashboard = {
           </div>
           ${(() => {
             const lv = Gamify.level(Gamify.xp());
-            return `<a class="level-mini" href="#/badges" title="Open Badges">
+            const p = Gamify.penalty();
+            const pen = p.total ? `<div class="penalty-mini">−${p.total} XP missed-work penalty <a href="#/badges">details</a></div>` : '';
+            return pen + `<a class="level-mini" href="#/badges" title="Open Badges">
               <span class="level-badge">Lv ${lv.level}</span>
               <div class="level-mini-bar"><div class="progress-fill" style="width:${lv.pct}%"></div></div>
               <span class="muted small">${lv.into}/${lv.need} XP</span>
