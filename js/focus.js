@@ -250,6 +250,7 @@ const Focus = {
       focusMin: Utils.clamp(focusMin, 1, 180), breakMin: Utils.clamp(breakMin, 1, 60),
       taskId: taskId || '', category: category || 'Learning'
     };
+    this.setView('pomodoro'); // starting a pomodoro must show the pomodoro panel
     this.savePomo();
     askNotifyPermission(); // gentle: ask once when they start using pomodoros
     toast(`🍅 Pomodoro started — ${focusMin} min focus.`, 'success');
