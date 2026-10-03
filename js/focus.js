@@ -16,14 +16,46 @@ const Focus = {
   _interval: null,
 
   init() {
-    this.timer = Utils.pref('focusTimer', null);
-    this.pomo = Utils.pref('focusPomo', null);
+    // IMPORTANT: Utils.pref(key) with ONE arg reads; passing null as the 2nd
+    // arg would WRITE null over the stored state — always read single-arg.
+    this.timer = Utils.pref('focusTimer');
+    this.pomo = Utils.pref('focusPomo');
+    // restore whichever mode was active when the app was closed (a running
+    // pomodoro must be visible again after reopen, not hidden behind stopwatch)
+    const savedView = Utils.pref('focusView');
+    if (savedView === 'pomodoro' || savedView === 'stopwatch') this.view = savedView;
+    // the live timer state wins over the saved tab preference — a running
+    // stopwatch must not be hidden behind a stale 'pomodoro' view either
+    if (this.pomo) this.view = 'pomodoro';
+    else if (this.timer && (this.timer.running || this.timer.accumulatedMs > 0)) this.view = 'stopwatch';
     this.recoverPomo();
+    this.recoverTimer();
     this._interval = setInterval(() => this.tick(), 1000);
   },
 
+  setView(v) { this.view = v; Utils.pref('focusView', v); },
+
   save() { Utils.pref('focusTimer', this.timer); },
   savePomo() { Utils.pref('focusPomo', this.pomo); },
+
+  /** Away-too-long guard: reopening after hours must not log an absurd session.
+      Pauses the stopwatch and, when very long, clamps the elapsed time to a
+      sensible value (the real block length can be edited in the save modal). */
+  recoverTimer() {
+    const t = this.timer;
+    if (!t || !t.running || !t.startedAt) return;
+    const awayMs = Date.now() - t.startedAt;
+    const THREE_HOURS = 3 * 60 * 60000;
+    if (awayMs < THREE_HOURS) return; // normal short absence — time keeps counting
+    // clamp: keep at most 3 hours, mark it so the user can fix the duration
+    t.accumulatedMs += THREE_HOURS;
+    t.running = false;
+    t.startedAt = null;
+    t.awayClamped = true;
+    this.save();
+    setTimeout(() => toast('⏸ Timer paused — you were away ' + Utils.fmtMinutes(Math.round(awayMs / 60000)) +
+      '. Elapsed clamped to 3h max; edit the duration when saving.', 'warn'), 800);
+  },
 
   /* ================= shared helpers ================= */
 
@@ -299,7 +331,9 @@ const Focus = {
     const modeOptions = (CONFIG.FOCUS_MODES || []).map(m =>
       `<option value="${Utils.esc(m.name)}">${Utils.esc(m.name)} · ~${m.suggested_minutes} min</option>`).join('');
     const categoryOptions = Options.get('taskCategories').map(c => `<option>${Utils.esc(c)}</option>`).join('');
-    const taskOptions = '<option value="">— no specific task —</option>' + tasks.map(t =>
+    // dropdowns list only tasks with work remaining — completed/archived make no sense to focus
+    const openTasks = tasks.filter(t => !t._archived && t.status !== 'completed');
+    const taskOptions = '<option value="">— no specific task —</option>' + openTasks.map(t =>
       `<option value="${t.id}" ${today === t.scheduled_date ? 'data-today="1"' : ''}>${Utils.esc(t.title)}</option>`).join('');
 
     container.innerHTML = `
@@ -320,7 +354,7 @@ const Focus = {
 
     container.onclick = e => {
       const fmode = e.target.closest('[data-fmode]');
-      if (fmode) { this.view = fmode.dataset.fmode; return this.page(container); }
+      if (fmode) { this.setView(fmode.dataset.fmode); return this.page(container); }
       const pbtn = e.target.closest('[data-pomo]');
       if (pbtn) return this.pomoAction(pbtn.dataset.pomo, container);
       const btn = e.target.closest('[data-focus]');
@@ -344,7 +378,9 @@ const Focus = {
     if (!panel) return;
     const tasks = App.state.tasks || [];
     const today = Utils.today();
-    const taskOptions = '<option value="">— no specific task —</option>' + tasks.map(t =>
+    // dropdowns list only tasks with work remaining — completed/archived make no sense to focus
+    const openTasks = tasks.filter(t => !t._archived && t.status !== 'completed');
+    const taskOptions = '<option value="">— no specific task —</option>' + openTasks.map(t =>
       `<option value="${t.id}" ${today === t.scheduled_date ? 'data-today="1"' : ''}>${Utils.esc(t.title)}</option>`).join('');
     const categoryOptions = Options.get('taskCategories').map(c => `<option>${Utils.esc(c)}</option>`).join('');
     const modeOptions = (CONFIG.FOCUS_MODES || []).map(m =>
