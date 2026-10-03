@@ -151,13 +151,16 @@ const API = {
   /* ---------- getAll (same shape the App shell expects) ---------- */
 
   async getAll() {
+    // settings fetched alongside (SB_TABLES lacks it — key/value rows handled below)
     const jobs = Object.keys(SB_TABLES).map(async k => [k, await this.listAll(SB_TABLES[k])]);
+    jobs.push((async () => ['settingsRows', await this.listAll('settings')])());
     const results = await Promise.all(jobs);
     const data = {};
     results.forEach(([k, rows]) => { data[k] = rows; });
     // settings: [{key,value}] -> object
     const settings = {};
-    (data.settings || []).forEach(r => { settings[r.key] = r.value; });
+    (data.settingsRows || []).forEach(r => { settings[r.key] = r.value; });
+    delete data.settingsRows;
     data.settings = settings;
     data.serverTime = new Date().toISOString();
     return data;
