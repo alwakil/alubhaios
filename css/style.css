@@ -596,6 +596,31 @@ input[readonly] { opacity: 0.7; }
 .stars .star-btn:hover { transform: scale(1.25); color: var(--c-warn); }
 .stars .star-btn.on { color: var(--c-warn); }
 
+/* red pause clock (distraction zone) */
+.pause-clock-block {
+  margin: 12px auto;
+  max-width: 420px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  text-align: center;
+}
+.pause-phase {
+  color: var(--c-danger);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+.pause-warning {
+  color: var(--c-danger);
+  font-weight: 700;
+  font-size: 14px;
+  margin: 10px 0 4px;
+}
+#pause-ring .focus-time { color: var(--c-danger); }
+
 /* ---------------- Routine cards ---------------- */
 
 .routine-card { display: flex; align-items: center; gap: 16px; }

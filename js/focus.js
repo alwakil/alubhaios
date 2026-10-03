@@ -125,6 +125,7 @@ const Focus = {
     t.accumulatedMs += Date.now() - t.startedAt;
     t.running = false; t.startedAt = null;
     t.pausedAt = Date.now(); // pause→distraction (A): remember when the break began
+    t.pauseNagCycle = 0; // fresh nag cycle for this pause
     this.save();
     App.refreshCurrent();
   },
@@ -166,7 +167,66 @@ const Focus = {
       .catch(() => { /* silent — resume must never fail because of this */ });
   },
 
-  stop() { if (this.timer) this.openSaveModal(); },
+  /* ---------------- red pause clock + 5-min nag ---------------- */
+
+  PAUSE_NAG_MS: 5 * 60000,
+
+  /** The paused object (pomodoro first, then stopwatch) or null. */
+  _anyPaused() {
+    const p = this.pomo;
+    if (p && !p.running && p.pausedAt) return p;
+    const t = this.timer;
+    if (t && !t.running && t.pausedAt) return t;
+    return null;
+  },
+
+  /** Runs every tick while something is paused: fires the 5-min beep +
+      notification nag and live-updates the red pause clock on the page. */
+  _tickPause(obj) {
+    const elapsed = Date.now() - obj.pausedAt;
+    const cycle = this.PAUSE_NAG_MS;
+    const cycles = Math.floor(elapsed / cycle);
+    if (cycles > (obj.pauseNagCycle || 0)) {
+      obj.pauseNagCycle = cycles;
+      if (this.pomo === obj) this.savePomo(); else if (this.timer === obj) this.save();
+      beep(3);
+      notify('🚨 You are in distraction!', 'Pause time is being counted — get back to track!');
+      if (App.current === 'focus') toast('🚨 Distraction alert — back to work!', 'warn');
+    }
+    if (App.current !== 'focus') return;
+    const remainMs = cycle - (elapsed % cycle);
+    const qt = qs('#pause-time');
+    if (qt) qt.textContent = Utils.fmtClock(Math.ceil(remainMs / 1000));
+    const qr = qs('#pause-ring');
+    if (qr) qr.style.background = `conic-gradient(#ef4444 ${(1 - (elapsed % cycle) / cycle) * 100}%, var(--chart-grid) 0)`;
+    const qsf = qs('#pause-so-far');
+    if (qsf) qsf.textContent = Utils.fmtMinutes(Math.floor(elapsed / 60000));
+  },
+
+  _pauseClockHtml() {
+    return `
+      <div class="pause-clock-block">
+        <div class="pause-phase">${icon('triangle-exclamation')} PAUSED — DISTRACTION ZONE</div>
+        <div class="focus-ring-wrap">
+          <div class="focus-ring" id="pause-ring"><div class="focus-ring-inner">
+            <div class="focus-time" id="pause-time">5:00</div>
+            <div class="muted small">next distraction alert</div>
+          </div></div>
+        </div>
+        <p class="pause-warning">🚨 You are in distraction — get back to track!</p>
+        <p class="muted small">Distraction so far: <b id="pause-so-far">0m</b> · logged when you resume (1m+)</p>
+      </div>`;
+  },
+
+  stop() {
+    if (!this.timer) return;
+    // stopping while paused: the trailing pause segment still counts as distraction
+    if (!this.timer.running && this.timer.pausedAt) {
+      this._logPauseAsDistraction(this.timer.pausedAt, Date.now());
+      this.timer.pausedAt = null;
+    }
+    this.openSaveModal();
+  },
 
   async discard() {
     const ok = await confirmDialog({
@@ -202,6 +262,7 @@ const Focus = {
     t.remainingMs = Math.max(0, t.endsAt - Date.now());
     t.running = false;
     t.pausedAt = Date.now(); // pause→distraction (A)
+    t.pauseNagCycle = 0; // fresh nag cycle for this pause
     this.savePomo();
     App.refreshCurrent();
   },
@@ -247,6 +308,10 @@ const Focus = {
     const t = this.pomo;
     if (!t) return;
     if (t.phase === 'focus') {
+      if (!t.running && t.pausedAt) {
+        this._logPauseAsDistraction(t.pausedAt, Date.now());
+        t.pausedAt = null;
+      }
       const min = Math.max(1, Math.round((this.pomoPhaseTotalMs() - this.pomoRemainingMs()) / 60000));
       this.logAndReset(min);
     } else {
@@ -310,6 +375,10 @@ const Focus = {
         this.advancePhase(false);
       }
     }
+
+    // red pause clock + 5-min distraction nag (works on any page)
+    const paused = this._anyPaused();
+    if (paused) this._tickPause(paused);
 
     // topbar chip (both modes)
     const chipEl = qs('#topbar-timer');
@@ -439,6 +508,7 @@ const Focus = {
             </div></div>
           </div>
           <p class="muted" id="pomo-hint">${t.running ? (t.phase === 'focus' ? 'Focus block running — stay with it. 🍅' : 'Break time — relax. ☕') : 'Paused.'}</p>
+          ${!t.running && t.pausedAt ? this._pauseClockHtml() : ''}
           <div class="focus-controls">
             ${t.running
               ? `<button class="btn btn-lg" data-pomo="pause">${icon('pause')} Pause</button>`
@@ -491,6 +561,7 @@ const Focus = {
         </div></div>
       </div>
       <p class="muted" id="focus-state-hint">${this.timer.running ? 'Session running — stay with it.' : 'Paused.'}</p>
+      ${!this.timer.running && this.timer.pausedAt ? this._pauseClockHtml() : ''}
       <div class="focus-controls">
         ${this.timer.running
           ? `<button class="btn btn-lg" data-focus="pause">${icon('pause')} Pause</button>`
