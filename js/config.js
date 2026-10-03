@@ -10,7 +10,7 @@ const CONFIG = {
   // Your Google Apps Script Web App URL (permanent default for this app).
   // Any value saved later in Settings → Backend connection OVERRIDES this
   // (stored per browser); leave the Settings field empty to use this one.
-  API_URL: "https://script.google.com/macros/s/AKfycbwgU_59SYgnZ5e1jYYpJmJT2E23-_07yhRKEkD8EJQAmDxH8s2iw0udJOlhxtJIJh9cgQ/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbxsgyuxYIhF3OVV36Y9thznNJJMNIRRCShlbeQnA-4nX33IFJFRNwC84fLInqeStkJk/exec",
 
   APP_NAME: "PersonalOS",
   VERSION: "1.0.0",
