@@ -12,8 +12,8 @@ const CONFIG = {
   // Your Supabase project settings (permanent defaults for this app).
   // Values saved later in Settings → Backend connection OVERRIDE these
   // (stored per browser); leave the Settings fields empty to use these.
-  SUPABASE_URL: "YOUR_SUPABASE_PROJECT_URL",
-  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY",
+  SUPABASE_URL: "https://dtxqklysrsvylyzxpkur.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHFrbHlzcnN2eWx5enhwa3VyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzEwNTcsImV4cCI6MjEwNjYwNzA1N30.lDqj65ezE5N38YxzKgNMhpiqJ-b_q5pHQROilyIUmbU",
 
   APP_NAME: "AluBhaiOS",
   VERSION: "2.0.0",

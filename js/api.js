@@ -102,12 +102,14 @@ const API = {
 
   async listAll(table) {
     // paginated read (Supabase defaults to 1000 rows — page through all)
+    // settings has no id column (PK is "key") — order by key there
+    const orderCol = table === 'settings' ? 'key' : 'id';
     const all = [];
     let from = 0;
     for (;;) {
       const rows = await this.rest(table, {
         method: 'GET',
-        qs: `?select=*&order=id&limit=1000&offset=${from}`
+        qs: `?select=*&order=${orderCol}&limit=1000&offset=${from}`
       });
       if (!Array.isArray(rows) || !rows.length) break;
       all.push(...rows);
