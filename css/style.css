@@ -582,6 +582,20 @@ input[readonly] { opacity: 0.7; }
 .star-on { color: var(--c-warn); }
 .star-off { color: var(--border); }
 
+/* clickable focus-rating stars (Focus page session list) */
+.stars .star-btn {
+  background: none;
+  border: 0;
+  padding: 0 1px;
+  cursor: pointer;
+  color: var(--border);
+  font-size: 13px;
+  line-height: 1;
+  transition: color 0.15s, transform 0.1s;
+}
+.stars .star-btn:hover { transform: scale(1.25); color: var(--c-warn); }
+.stars .star-btn.on { color: var(--c-warn); }
+
 /* ---------------- Routine cards ---------------- */
 
 .routine-card { display: flex; align-items: center; gap: 16px; }

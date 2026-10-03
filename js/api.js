@@ -230,6 +230,7 @@ const API = {
 
   /* -------- focus sessions -------- */
   createFocusSession(data) { return this.create('focus_sessions', data); },
+  updateFocusSession(id, patch) { return this.patch('focus_sessions', id, patch); },
   deleteFocusSession(id) { return this.remove('focus_sessions', id); },
 
   /* -------- reviews (upsert by natural key, like the GAS backend) -------- */

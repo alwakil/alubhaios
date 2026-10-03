@@ -538,6 +538,9 @@ const Focus = {
       </div>
       ${sessions.map(s => {
         const task = (App.state.tasks || []).find(t => t.id === s.task_id);
+        const rating = Utils.num(s.focus_rating);
+        const starBtns = [1, 2, 3, 4, 5].map(n =>
+          `<button class="star-btn ${n <= rating ? 'on' : ''}" data-session-rate="${n}" title="Rate focus quality ${n}/5">${icon('star')}</button>`).join('');
         return `
         <div class="card session-card" data-id="${s.id}">
           <div class="task-main">
@@ -546,7 +549,7 @@ const Focus = {
               ${chip(String(s.start_time).slice(11, 16) + ' – ' + String(s.end_time).slice(11, 16), '#64748b')}
               ${chip(Utils.fmtMinutes(s.duration_minutes), 'var(--c-primary)')}
               ${chip(s.category || 'Other', Utils.categoryColor(s.category))}
-              <span class="stars">${Utils.stars(s.focus_rating)}</span>
+              <span class="stars" title="Tap a star to rate how focused you were">${starBtns}</span>
               ${Utils.num(s.interruptions) ? chip(s.interruptions + ' interruptions', '#ef4444') : ''}
             </div>
             ${s.notes ? `<div class="muted small">${Utils.esc(String(s.notes).replace(/\[pomo\]/i, '').trim())}</div>` : ''}
@@ -559,6 +562,19 @@ const Focus = {
   },
 
   handleSessionAction(e) {
+    const rateBtn = e.target.closest('[data-session-rate]');
+    if (rateBtn) {
+      const id = rateBtn.closest('[data-id]').dataset.id;
+      const rating = Number(rateBtn.dataset.sessionRate);
+      API.updateFocusSession(id, { focus_rating: rating })
+        .then(rec => {
+          App.replaceRecord('focusSessions', rec);
+          App.refreshCurrent();
+          toast(`Rated ${rating}/5 ${'⭐'.repeat(Math.min(rating, 5))}`, 'success');
+        })
+        .catch(e2 => App.handleError(e2));
+      return;
+    }
     const btn = e.target.closest('[data-session-action]');
     if (!btn || btn.dataset.sessionAction !== 'delete') return;
     const id = btn.closest('[data-id]').dataset.id;
