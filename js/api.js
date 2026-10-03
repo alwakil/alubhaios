@@ -33,7 +33,8 @@ const API = {
       err.code = 'NOT_CONFIGURED';
       throw err;
     }
-    const maxTries = (_retries === undefined && this.isRead(action)) ? 2 : 1;
+    // every write is idempotent now (client ids + upserts), so all actions can retry once
+    const maxTries = (_retries === undefined) ? 2 : 1;
     data = Object.assign({}, data);
     // Client-side idempotency key: if Apps Script double-executes a POST,
     // the backend recognises the id and does not create a duplicate.
@@ -83,6 +84,7 @@ const API = {
       err.code = 'API';
       throw err;
     }
+    if (window.App && App.hideError) App.hideError(); // success clears an earlier hiccup banner
     return json.data;
   },
 
