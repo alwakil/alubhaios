@@ -162,6 +162,7 @@ const Focus = {
     })
       .then(rec => {
         App.replaceRecord('focusSessions', rec);
+        if (window.Arena) Arena.punch('phonu'); // Phonu gloats — it gained time
         toast(`⏸ Pause logged as distraction (${Utils.fmtMinutes(minutes)}).`, 'info');
       })
       .catch(() => { /* silent — resume must never fail because of this */ });
@@ -192,30 +193,34 @@ const Focus = {
       beep(3);
       notify('🚨 You are in distraction!', 'Pause time is being counted — get back to track!');
       if (App.current === 'focus') toast('🚨 Distraction alert — back to work!', 'warn');
+      if (window.Arena) Arena.punch('phonu'); // Phonu lands a blow
     }
     if (App.current !== 'focus') return;
     const remainMs = cycle - (elapsed % cycle);
-    const qt = qs('#pause-time');
+    const qt = qs('#pause-next');
     if (qt) qt.textContent = Utils.fmtClock(Math.ceil(remainMs / 1000));
     const qr = qs('#pause-ring');
     if (qr) qr.style.background = `conic-gradient(#ef4444 ${(1 - (elapsed % cycle) / cycle) * 100}%, var(--chart-grid) 0)`;
-    const qsf = qs('#pause-so-far');
-    if (qsf) qsf.textContent = Utils.fmtMinutes(Math.floor(elapsed / 60000));
+    const qtt = qs('#pause-total');
+    if (qtt) qtt.textContent = Utils.fmtClock(Math.floor(elapsed / 1000)); // count-up total
   },
 
-  _pauseClockHtml() {
+  /** Side-by-side duel: the frozen focus ring VS the red pause clock
+      (big number counts UP = total pause time; ring = 5-min nag cycle). */
+  _pauseDuelHtml(leftRingHtml) {
     return `
-      <div class="pause-clock-block">
-        <div class="pause-phase">${icon('triangle-exclamation')} PAUSED — DISTRACTION ZONE</div>
-        <div class="focus-ring-wrap">
-          <div class="focus-ring" id="pause-ring"><div class="focus-ring-inner">
-            <div class="focus-time" id="pause-time">5:00</div>
-            <div class="muted small">next distraction alert</div>
+      <div class="pause-duel">
+        <div class="duel-side">${leftRingHtml}</div>
+        <div class="duel-vs">VS</div>
+        <div class="duel-side">
+          <div class="focus-ring duel-red" id="pause-ring"><div class="focus-ring-inner">
+            <div class="focus-time" id="pause-total">00:00</div>
+            <div class="muted small">🔴 paused</div>
           </div></div>
         </div>
-        <p class="pause-warning">🚨 You are in distraction — get back to track!</p>
-        <p class="muted small">Distraction so far: <b id="pause-so-far">0m</b> · logged when you resume (1m+)</p>
-      </div>`;
+      </div>
+      <p class="muted small">🔔 next alert in <b id="pause-next">5:00</b> · pause logs as distraction on resume (1m+)</p>
+      <p class="pause-warning">🚨 You are in distraction — get back to track!</p>`;
   },
 
   stop() {
@@ -449,11 +454,15 @@ const Focus = {
 
       <div class="card focus-panel" id="focus-panel"></div>
 
+      <div class="section-head"><h3>${icon('shield-halved')} Focus Arena</h3></div>
+      <div id="focus-arena" class="card"></div>
+
       <div class="section-head"><h3>Today's sessions</h3></div>
       <div id="focus-sessions" class="stack"></div>
     `;
 
     this.renderPanel();
+    if (window.Arena) Arena.render(qs('#focus-arena', container));
 
     container.onclick = e => {
       const fmode = e.target.closest('[data-fmode]');
@@ -509,7 +518,7 @@ const Focus = {
             </div></div>
           </div>
           <p class="muted" id="pomo-hint">${t.running ? (t.phase === 'focus' ? 'Focus block running — stay with it. 🍅' : 'Break time — relax. ☕') : 'Paused.'}</p>
-          ${!t.running && t.pausedAt ? this._pauseClockHtml() : ''}
+          ${!t.running && t.pausedAt ? this._pauseDuelHtml(`<div class="focus-ring" id="pomo-ring"><div class="focus-ring-inner"><div class="focus-time" id="pomo-time">${Utils.fmtClock(Math.ceil(this.pomoRemainingMs() / 1000))}</div><div class="muted small">⚡ ${t.focusMin}m focus · ${t.breakMin}m break</div></div></div>`) : ''}
           <div class="focus-controls">
             ${t.running
               ? `<button class="btn btn-lg" data-pomo="pause">${icon('pause')} Pause</button>`
@@ -562,7 +571,7 @@ const Focus = {
         </div></div>
       </div>
       <p class="muted" id="focus-state-hint">${this.timer.running ? 'Session running — stay with it.' : 'Paused.'}</p>
-      ${!this.timer.running && this.timer.pausedAt ? this._pauseClockHtml() : ''}
+      ${!this.timer.running && this.timer.pausedAt ? this._pauseDuelHtml(`<div class="focus-ring" id="focus-ring"><div class="focus-ring-inner"><div class="focus-time">${Utils.fmtClock(this.elapsedSec())}</div><div class="muted small">⚡ ${Utils.esc(this.timer.mode)} · ${Utils.esc(this.timer.category)}</div></div></div>`) : ''}
       <div class="focus-controls">
         ${this.timer.running
           ? `<button class="btn btn-lg" data-focus="pause">${icon('pause')} Pause</button>`

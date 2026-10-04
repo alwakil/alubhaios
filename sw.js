@@ -7,14 +7,16 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'alubhaios-v2.1.6';
+const CACHE = 'alubhaios-v2.2.0';
 const CORE = [
   'index.html',
   'manifest.webmanifest',
   'assets/icons/favicon.svg',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',
+  'css/arena.css',
   'assets/vendor/chart.umd.min.js',
+  'js/arena.js',
   'assets/vendor/fonts/inter.css',
   'assets/vendor/fonts/inter-var-latin.woff2',
   'assets/vendor/fontawesome/css/all.min.css',
