@@ -151,6 +151,24 @@ const Analytics = {
       .sort((a, b) => b.minutes - a.minutes);
   },
 
+  /** Category distribution EXCLUDING distraction categories — for the
+      "productive time by category" charts (the distraction share already
+      lives in the focus-vs-distraction chart). */
+  productiveCategoryDistribution(days) {
+    const from = Utils.addDays(Utils.today(), -(days - 1));
+    const totals = {};
+    (App.state.focusSessions || []).forEach(s => {
+      if (this.sessionDate(s) < from) return;
+      const cat = s.category || 'Other';
+      if (Utils.isDistraction(cat)) return;
+      totals[cat] = (totals[cat] || 0) + Utils.num(s.duration_minutes);
+    });
+    const total = Object.values(totals).reduce((a, b) => a + b, 0);
+    return Object.keys(totals)
+      .map(cat => ({ category: cat, minutes: totals[cat], pct: total ? Math.round(totals[cat] / total * 100) : 0 }))
+      .sort((a, b) => b.minutes - a.minutes);
+  },
+
   /** Best weekday for task completion (needs >=2 samples per weekday). */
   bestWeekday(days) {
     const daily = this.dailyStats(days);
@@ -482,7 +500,7 @@ const AnalyticsPage = {
           <div class="chart-box"><canvas id="an-weekly"></canvas></div>
         </div>
         <div class="card chart-card">
-          <h3 class="card-title">Category distribution</h3>
+          <h3 class="card-title">Productive time by category</h3>
           <div class="chart-box"><canvas id="an-categories"></canvas></div>
         </div>
         <div class="card chart-card">
@@ -512,7 +530,7 @@ const AnalyticsPage = {
     this.tasksChart('an-tasks', daily);
     this.habitsChart('an-habits', daily);
     this.weeklyChart('an-weekly', weeks);
-    Dashboard.categoryChart('an-categories', Analytics.categoryDistribution(r), r);
+    Dashboard.categoryChart('an-categories', Analytics.productiveCategoryDistribution(r), r);
     this.plannedActualChart('an-planned-actual', daily);
     Dashboard.focusDistractionChart('an-focus-distraction', daily);
     this.planningCard();

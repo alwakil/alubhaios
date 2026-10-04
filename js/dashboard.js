@@ -80,7 +80,7 @@ const Dashboard = {
           <div class="chart-box"><canvas id="dash-productivity"></canvas></div>
         </div>
         <div class="card chart-card">
-          <h3 class="card-title">Time by category — 7 days</h3>
+          <h3 class="card-title">Productive time by category — 7 days</h3>
           <div class="chart-box"><canvas id="dash-categories"></canvas></div>
         </div>
         <div class="card chart-card">
@@ -130,7 +130,7 @@ const Dashboard = {
 
     const daily = Analytics.dailyStats(7);
     this.productivityChart('dash-productivity', daily);
-    this.categoryChart('dash-categories', Analytics.categoryDistribution(7), 7);
+    this.categoryChart('dash-categories', Analytics.productiveCategoryDistribution(7), 7);
     this.focusDistractionChart('dash-focus-distraction', daily);
   },
 
