@@ -23,6 +23,22 @@ const Routines = {
     try { return JSON.parse(App.settings.routine_task_log || '{}'); } catch (e) { return {}; }
   },
 
+  /** per-routine "auto day task" flags live in Settings JSON (the routines
+      table has no auto_task column — sending one → PGRST204). */
+  autoFlags() {
+    try { return JSON.parse(App.settings.routine_auto_task || '{}'); } catch (e) { return {}; }
+  },
+  isAuto(r) { return this.autoFlags()[r.id] === true; },
+  async setAuto(routineId, on) {
+    const flags = this.autoFlags();
+    if (on) flags[routineId] = true; else delete flags[routineId];
+    App.settings.routine_auto_task = JSON.stringify(flags);
+    try {
+      await API.saveSettings({ routine_auto_task: App.settings.routine_auto_task });
+      return true;
+    } catch (e) { App.handleError(e); return false; }
+  },
+
   /** boot job — create today's auto day tasks (idempotent, never backfills past days). */
   async ensureTodayTasks() {
     if (!App.online) return;
@@ -34,7 +50,7 @@ const Routines = {
 
     for (const r of (App.state.routines || [])) {
       if (r.enabled === false) continue;
-      if (!(r.auto_task === true || r.auto_task === 'true')) continue;
+      if (!this.isAuto(r)) continue;
       if (!this.coversDay(r, wd)) continue;
 
       log[r.id] = log[r.id] || {};
@@ -155,7 +171,7 @@ const Routines = {
     }
 
     list.innerHTML = items.map(r => {
-      const auto = r.auto_task === true || r.auto_task === 'true';
+      const auto = this.isAuto(r);
       return `
       <div class="card routine-card ${r.enabled === false ? 'is-disabled' : ''}" data-id="${r.id}">
         <div class="routine-time-big">${Utils.esc(r.target_time || '--:--')}</div>
@@ -226,7 +242,7 @@ const Routines = {
           <label class="field"><span>Description</span>
             <textarea name="description" rows="2">${Utils.esc(r.description || '')}</textarea></label>
           <label class="check-inline" style="margin:4px 0 10px">
-            <input type="checkbox" name="auto_task" ${(r.auto_task === true || r.auto_task === 'true') ? 'checked' : ''}>
+            <input type="checkbox" name="auto_task" ${this.isAuto(r) ? 'checked' : ''}>
             🤖 Auto day task — a task is created automatically on each scheduled day
           </label>
           <div class="field">
@@ -258,18 +274,21 @@ const Routines = {
       if (!form.reportValidity()) return;
       const fd = new FormData(form);
       const chosen = fd.getAll('days');
+      const wantAuto = fd.get('auto_task') === 'on';
       const data = {
         title: fd.get('title').trim(),
         description: fd.get('description'),
         category: fd.get('category'),
         target_time: fd.get('target_time') || '',
         duration_minutes: fd.get('duration_minutes') === '' ? '' : Utils.num(fd.get('duration_minutes')),
-        days: chosen.length === 7 ? 'Every day' : (chosen.length ? chosen.join(',') : 'Every day'),
-        auto_task: fd.get('auto_task') === 'on'
+        days: chosen.length === 7 ? 'Every day' : (chosen.length ? chosen.join(',') : 'Every day')
+        // NOTE: auto-task flag is NOT sent to the routines table (no such
+        // column → PGRST204) — it lives in Settings (Routines.setAuto).
       };
       const save = existing ? API.updateRoutine(r.id, data) : API.createRoutine(data);
-      save.then(rec => {
+      save.then(async rec => {
         App.replaceRecord('routines', rec);
+        await this.setAuto(rec.id, wantAuto);
         m.close();
         App.refreshCurrent();
         toast(existing ? 'Routine updated' : 'Routine created', 'success');
