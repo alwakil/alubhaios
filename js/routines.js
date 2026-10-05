@@ -90,32 +90,79 @@ const Routines = {
     }
   },
 
-  /** this week's dot strip for one routine (Mon→Sun, today highlighted). */
+  /** this week's INTERACTIVE dot strip (Mon→Sun): progress trail behind,
+      pulsing today, ✓ pops, and every scheduled dot is clickable —
+      click a day without a task to create it (today or backfill a miss). */
   weekStrip(r) {
     const today = Utils.today();
     const ws = Utils.startOfWeek(today);
     const log = this.log()[r.id] || {};
     const cells = [];
+    let scheduled = 0, done = 0;
     for (let i = 0; i < 7; i++) {
       const date = Utils.addDays(ws, i);
       const wd = Utils.weekdayShort(date);
       const isDay = this.coversDay(r, wd);
-      let cls = 'rt-dot' + (date === today ? ' today' : '');
+      const isToday = date === today;
+      let cls = 'rt-dot' + (isToday ? ' today' : '');
       let tip = wd + ' ' + date.slice(5);
+      let label = wd.slice(0, 2);
       if (!isDay) { cls += ' off'; tip += ' — not scheduled'; }
       else {
         const t = (App.state.tasks || []).find(x => !x._archived &&
           x.project_id === this.marker(r.id) && String(x.scheduled_date || '').slice(0, 10) === date);
-        if (t && t.status === 'completed') { cls += ' done'; tip += ' — done ✓'; }
-        else if (t && date < today) { cls += ' miss'; tip += ' — missed'; }
-        else if (t) { cls += ' pend'; tip += ' — task pending'; }
+        if (t && t.status === 'completed') { cls += ' done'; label = '✓'; tip += ' — done ✓ (tap to view)'; scheduled++; done++; }
+        else if (t && date < today) { cls += ' miss'; tip += ' — missed (tap to backfill)'; scheduled++; }
+        else if (t) { cls += ' pend'; tip += ' — task pending (tap to view)'; scheduled++; if (date <= today) done++; }
         else if (log[date]) { cls += ' off'; tip += ' — task removed'; }
-        else if (date === today) { tip += ' — no task yet'; }
-        else { cls += ' future'; tip += ' — upcoming'; }
+        else if (date > today) { cls += ' future'; tip += ' — upcoming (task arrives on its day)'; }
+        else { cls += ' open'; tip += ' — tap to create the task now'; scheduled++; }
       }
-      cells.push(`<span class="${cls}" title="${Utils.esc(tip)}">${wd.slice(0, 2)}</span>`);
+      cells.push(`<button type="button" class="${cls}" data-routine-action="day" data-rt-date="${date}" title="${Utils.esc(tip)}">${label}</button>`);
     }
-    return `<div class="rt-week">${cells.join('')}</div>`;
+    const pct = scheduled ? Math.round(done / scheduled * 100) : 0;
+    return `
+      <div class="rt-week" title="This week — tap a day dot">
+        <div class="rt-track-wrap"><div class="rt-track" style="width:${pct}%"></div></div>
+        ${cells.join('')}
+      </div>
+      <div class="rt-week-meta muted small">${done}/${scheduled} scheduled days done this week${pct === 100 && scheduled ? ' — 🏆 perfect!' : ''}</div>`;
+  },
+
+  /** dot click: task exists → view in Tasks; scheduled day without task →
+      create it now (today or explicit backfill of a miss). */
+  async dayDotClick(r, date) {
+    const today = Utils.today();
+    const t = (App.state.tasks || []).find(x => !x._archived &&
+      x.project_id === this.marker(r.id) && String(x.scheduled_date || '').slice(0, 10) === date);
+    if (t) {
+      Tasks.filter = { status: '', category: '', priority: '', goal: '', date: '', search: this.marker(r.id) };
+      location.hash = '#/tasks';
+      App.route();
+      return;
+    }
+    if (!this.coversDay(r, Utils.weekdayShort(date))) return;
+    if (date > today) { toast('This day hasn\'t arrived yet — its task will be created on the day.', 'info'); return; }
+    try {
+      const rec = await API.createTask({
+        title: r.title,
+        description: '⏰ Auto from routine' + (r.target_time ? ' · ' + r.target_time : ''),
+        category: r.category || 'Other',
+        priority: 'medium',
+        scheduled_date: date,
+        estimated_minutes: Utils.num(r.duration_minutes) || '',
+        project_id: this.marker(r.id),
+        status: 'pending'
+      });
+      App.replaceRecord('tasks', rec);
+      const log = this.log();
+      log[r.id] = log[r.id] || {};
+      log[r.id][date] = true;
+      App.settings.routine_task_log = JSON.stringify(log);
+      await API.saveSettings({ routine_task_log: App.settings.routine_task_log });
+      toast(`📅 Task created for ${Utils.fmtDay(date)}${date < today ? ' (backfill)' : ''}`, 'success');
+      App.refreshCurrent();
+    } catch (e) { App.handleError(e); }
   },
 
   page(container) {
@@ -147,6 +194,7 @@ const Routines = {
         location.hash = '#/tasks';
         App.route();
       }
+      if (act === 'day') return this.dayDotClick(r, btn.dataset.rtDate);
     };
     this.renderList();
   },
@@ -170,10 +218,10 @@ const Routines = {
       return;
     }
 
-    list.innerHTML = items.map(r => {
+    list.innerHTML = items.map((r, idx) => {
       const auto = this.isAuto(r);
       return `
-      <div class="card routine-card ${r.enabled === false ? 'is-disabled' : ''}" data-id="${r.id}">
+      <div class="card routine-card ${r.enabled === false ? 'is-disabled' : ''}" data-id="${r.id}" style="--rt-i:${idx}">
         <div class="routine-time-big">${Utils.esc(r.target_time || '--:--')}</div>
         <div class="task-main">
           <div class="task-title">${Utils.esc(r.title)}</div>
