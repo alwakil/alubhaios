@@ -289,6 +289,7 @@ const Routines = {
       save.then(async rec => {
         App.replaceRecord('routines', rec);
         await this.setAuto(rec.id, wantAuto);
+        if (wantAuto) { try { await this.ensureTodayTasks(); } catch (e) { /* today's task comes on next boot */ } }
         m.close();
         App.refreshCurrent();
         toast(existing ? 'Routine updated' : 'Routine created', 'success');
