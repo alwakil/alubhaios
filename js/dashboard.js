@@ -279,16 +279,29 @@ const Dashboard = {
       ? `<ol class="priority-list">${top3.map(t => `<li><span class="pl-title">${Utils.esc(t.title)}</span>${chip(t.priority, Utils.priorityColor(t.priority))}</li>`).join('')}</ol>`
       : `<p class="muted">No open priorities today — add tasks or enjoy the clear runway.</p>`;
 
-    // routines timeline
-    qs('#today-routines', container).innerHTML = routines.length
-      ? `<div class="routine-timeline">${routines.map(r => `
-          <div class="routine-row">
-            <span class="routine-time">${Utils.esc(r.target_time || '--:--')}</span>
+    // routines timeline — UPGRADED: past/now/upcoming states + streak chips + anytime tasks
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const entries = this.todayTimelineEntries(routines, tasksToday, nowMin);
+    const routineEntries = entries.filter(e => e.kind === 'routine');
+    const tasksEntry = entries.find(e => e.kind === 'tasks');
+    qs('#today-routines', container).innerHTML = routineEntries.length
+      ? `<div class="routine-timeline">${routineEntries.map(e => `
+          <div class="routine-row ${e.state}">
+            <span class="routine-time">${Utils.esc(e.time)}</span>
             <span class="routine-dot"></span>
-            <span class="routine-name">${Utils.esc(r.title)}</span>
-            ${r.duration_minutes ? `<span class="muted">${Utils.fmtMinutes(r.duration_minutes)}</span>` : ''}
-          </div>`).join('')}</div>`
-      : `<p class="muted">No routines scheduled for ${Utils.esc(wd)}.</p>`;
+            <span class="routine-name">${Utils.esc(e.title)}</span>
+            ${e.dur ? `<span class="muted">${Utils.fmtMinutes(e.dur)}</span>` : ''}
+            ${e.streak > 0 ? chip('🔥 ' + e.streak + 'd', '#f97316') : ''}
+            ${e.state === 'now' ? chip('NOW', 'var(--c-primary)') : ''}
+          </div>`).join('')}
+        <div class="routine-row anytime">
+          <span class="routine-time">${icon('list-check')}</span>
+          <span class="routine-dot"></span>
+          <span class="routine-name">Anytime tasks</span>
+          <span class="muted">${tasksEntry.doneCount} done · ${tasksEntry.pending} pending</span>
+          ${tasksEntry.titles.map(t2 => chip(Utils.esc(t2), '#64748b')).join('')}
+        </div></div>`
+      : `<p class="muted">No routines scheduled for ${Utils.esc(wd)}${tasksToday.length ? ' — ' + tasksToday.length + ' flexible task' + (tasksToday.length > 1 ? 's' : '') + ' anytime.' : '.'}</p>`;
 
     // goals connected to today
     qs('#today-goals', container).innerHTML = goalsToday.length
@@ -325,6 +338,30 @@ const Dashboard = {
       : `<p class="muted">No habits yet — create one on the Habits page.</p>`;
 
     container.onclick = e => this.onClick(e);
+  },
+
+  /** Day timeline builder — pure (testable). Routines sorted by time with
+      past/now/upcoming state + streaks; one "anytime tasks" entry appended. */
+  todayTimelineEntries(routines, tasksToday, nowMin) {
+    const entries = routines.map(r => {
+      const tp = String(r.target_time || '');
+      const p = tp.split(':');
+      const mins = (p.length === 2 && /^\d{1,2}$/.test(p[0]) && /^\d{2}$/.test(p[1]))
+        ? Number(p[0]) * 60 + Number(p[1]) : null;
+      let state = 'upcoming';
+      if (mins === null) state = 'anytime';
+      else {
+        const end = mins + (Utils.num(r.duration_minutes) || 0);
+        if (end < nowMin) state = 'past';
+        else if (mins <= nowMin) state = 'now';
+      }
+      const streak = (window.Routines && Routines.routineStreak) ? Routines.routineStreak(r) : 0;
+      return { kind: 'routine', time: tp || '--:--', mins: mins === null ? 9999 : mins, title: r.title, dur: Utils.num(r.duration_minutes), state, streak };
+    }).sort((a, b) => a.mins - b.mins);
+    const pend = tasksToday.filter(t => t.status !== 'completed');
+    const doneCount = tasksToday.length - pend.length;
+    entries.push({ kind: 'tasks', time: 'any', mins: 9999, pending: pend.length, doneCount, titles: pend.slice(0, 3).map(t => t.title) });
+    return entries;
   },
 
   /* Shared click handling for dashboard + today */

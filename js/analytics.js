@@ -464,6 +464,8 @@ const AnalyticsPage = {
         </div>
       </div>
 
+      <div class="card" id="an-xp-battle"></div>
+
       <div class="card chart-card year-card">
         <h3 class="card-title">${icon('calendar-days')} Productivity heatmap — last 12 months</h3>
         <div class="year-heatmap-wrap">
@@ -519,6 +521,8 @@ const AnalyticsPage = {
 
       <div id="an-planning"></div>
     `;
+
+    this.renderXpBattle(qs('#an-xp-battle', container));
 
     container.onclick = e => {
       const b = e.target.closest('[data-range]');
@@ -717,6 +721,35 @@ const AnalyticsPage = {
       },
       options: Charts.lineOpts({ plugins: { legend: { display: true, position: 'bottom' }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Utils.fmtMinutes(ctx.raw)}` } } } })
     });
+  },
+
+  /** ⚔ Weekly XP battle — this week's earned XP vs last week's. */
+  renderXpBattle(wrap) {
+    if (!wrap) return;
+    const today = Utils.today();
+    const ws = Utils.startOfWeek(today);
+    const we = Utils.addDays(ws, 6);
+    const lws = Utils.addDays(ws, -7);
+    const lwe = Utils.addDays(ws, -1);
+    const thisXp = Gamify.xpBetween(ws, we);
+    const lastXp = Gamify.xpBetween(lws, lwe);
+    const max = Math.max(thisXp, lastXp, 1);
+    const w1 = Math.round(thisXp / max * 100), w2 = Math.round(lastXp / max * 100);
+    let verdict, cls;
+    if (thisXp > lastXp) { const d = thisXp - lastXp; verdict = `💪 Stronger than last week by ${d} XP!`; cls = 'v-good'; }
+    else if (thisXp < lastXp) { const d = lastXp - thisXp; verdict = `😈 Phonu gained ${d} XP on you — fight back!`; cls = 'v-bad'; }
+    else { verdict = '⚖ Dead even with last week.'; cls = 'v-neutral'; }
+    wrap.innerHTML = `
+      <h3 class="card-title">${icon('bolt')} Weekly XP battle</h3>
+      <div class="xp-battle">
+        <div class="xp-row"><span class="xp-label">This week</span>
+          <div class="xp-bar"><div class="xp-fill this" style="width:${w1}%"></div></div>
+          <b>${thisXp}</b></div>
+        <div class="xp-row"><span class="xp-label">Last week</span>
+          <div class="xp-bar"><div class="xp-fill last" style="width:${w2}%"></div></div>
+          <b>${lastXp}</b></div>
+        <div class="arena-verdict ${cls}">${verdict}</div>
+      </div>`;
   },
 
   planningCard() {

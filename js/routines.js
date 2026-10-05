@@ -39,6 +39,43 @@ const Routines = {
     } catch (e) { App.handleError(e); return false; }
   },
 
+  /** 🔥 current streak: consecutive completed scheduled days walking back
+      from today. Today completed counts; today pending/missing = grace. */
+  routineStreak(r) {
+    const marker = this.marker(r.id);
+    const doneOn = date => (App.state.tasks || []).some(x => !x._archived && x.project_id === marker &&
+      String(x.scheduled_date || '').slice(0, 10) === date && x.status === 'completed');
+    let streak = 0, cursor = Utils.today(), guard = 0;
+    if (this.coversDay(r, Utils.weekdayShort(cursor)) && doneOn(cursor)) streak++;
+    while (guard++ < 400) {
+      cursor = Utils.addDays(cursor, -1);
+      if (!this.coversDay(r, Utils.weekdayShort(cursor))) continue;
+      if (doneOn(cursor)) { streak++; continue; }
+      break;
+    }
+    return streak;
+  },
+
+  /** 🏆 best streak: longest run of consecutive completed scheduled days
+      in the routine's whole history (from its marker tasks). */
+  routineBestStreak(r) {
+    const marker = this.marker(r.id);
+    const done = new Set((App.state.tasks || []).filter(x => x.project_id === marker && x.status === 'completed')
+      .map(x => String(x.scheduled_date || '').slice(0, 10)).filter(Boolean));
+    if (!done.size) return 0;
+    let best = 0, run = 0, cursor = [...done].sort()[0];
+    const today = Utils.today();
+    let guard = 0;
+    while (cursor <= today && guard++ < 800) {
+      if (this.coversDay(r, Utils.weekdayShort(cursor))) {
+        if (done.has(cursor)) { run++; best = Math.max(best, run); }
+        else run = 0;
+      }
+      cursor = Utils.addDays(cursor, 1);
+    }
+    return best;
+  },
+
   /** boot job — create today's auto day tasks (idempotent, never backfills past days). */
   async ensureTodayTasks() {
     if (!App.online) return;
@@ -121,12 +158,14 @@ const Routines = {
       cells.push(`<button type="button" class="${cls}" data-routine-action="day" data-rt-date="${date}" title="${Utils.esc(tip)}">${label}</button>`);
     }
     const pct = scheduled ? Math.round(done / scheduled * 100) : 0;
+    const cur = this.routineStreak(r), best = this.routineBestStreak(r);
+    const streakTxt = (cur > 0 || best > 0) ? ` · 🔥 ${cur}d streak (best ${best}d)` : '';
     return `
       <div class="rt-week" title="This week — tap a day dot">
         <div class="rt-track-wrap"><div class="rt-track" style="width:${pct}%"></div></div>
         ${cells.join('')}
       </div>
-      <div class="rt-week-meta muted small">${done}/${scheduled} scheduled days done this week${pct === 100 && scheduled ? ' — 🏆 perfect!' : ''}</div>`;
+      <div class="rt-week-meta muted small">${done}/${scheduled} scheduled days done this week${pct === 100 && scheduled ? ' — 🏆 perfect!' : ''}${streakTxt}</div>`;
   },
 
   /** dot click: task exists → view in Tasks; scheduled day without task →
@@ -230,6 +269,7 @@ const Routines = {
             ${r.duration_minutes ? chip(Utils.fmtMinutes(r.duration_minutes), '#64748b') : ''}
             ${chip(String(r.days || 'Every day'), '#8b5cf6')}
             ${auto ? chip('🤖 Auto day task', '#10b981') : ''}
+            ${(() => { const s = this.routineStreak(r); return s > 0 ? chip('🔥 ' + s + 'd streak', '#f97316') : ''; })()}
           </div>
           ${r.description ? `<div class="muted small">${Utils.esc(r.description)}</div>` : ''}
           ${auto ? this.weekStrip(r) : ''}

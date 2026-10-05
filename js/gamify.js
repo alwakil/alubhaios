@@ -121,6 +121,29 @@ const Gamify = {
     return Math.max(0, b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf + b.salah - b.penalty);
   },
 
+  /** XP earned strictly between two dates (inclusive, YYYY-MM-DD) —
+      same multipliers as xpBreakdown, but range-filtered for the
+      weekly XP battle. */
+  xpBetween(from, to) {
+    const s = App.state;
+    const inR = d => { const x = String(d || '').slice(0, 10); return x >= from && x <= to; };
+    const isTrue = v => v === true || String(v).toLowerCase() === 'true';
+    let xp = 0;
+    (s.tasks || []).forEach(t => { if (t.status === 'completed' && inR(t.completed_at)) xp += 10; });
+    (s.habitLogs || []).forEach(l => { if (isTrue(l.completed) && !/❄|freeze/i.test(String(l.note || '')) && inR(l.date)) xp += 5; });
+    (s.focusSessions || []).forEach(x => { if (inR(x.start_time)) xp += Math.floor(Utils.num(x.duration_minutes) / 3); });
+    (s.dailyReviews || []).forEach(r => { if (inR(r.date)) xp += 15; });
+    (s.weeklyReviews || []).forEach(r => { if (inR(r.week_start)) xp += 25; });
+    (s.challenges || []).forEach(c => { if (c.status === 'solved' && inR(c.solved_date)) xp += 15; });
+    (s.salah || []).forEach(r => {
+      if (!inR(r.date)) return;
+      let n = 0;
+      ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].forEach(k => { if (isTrue(r[k])) n++; });
+      xp += n * 2 + (n === 5 ? 5 : 0);
+    });
+    return xp;
+  },
+
   level(xp) {
     const L = Math.floor(Math.sqrt((xp || 0) / 100)) + 1;
     const base = (L - 1) * (L - 1) * 100;

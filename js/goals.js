@@ -22,6 +22,30 @@ const GoalProgress = {
   }
 };
 
+const GoalPace = {
+  /** Milestone pace math for an active goal with a target date.
+      expected% = share of the goal's lifetime elapsed by today;
+      needPerMonth = how many progress-points/month finish on time.
+      Pure function (testable) — todayStr injectable. */
+  pace(g, todayStr) {
+    const today = todayStr || Utils.today();
+    if (!g.target_date || g.status === 'completed') return null;
+    const start = String(g.created_at || '').slice(0, 10) || today;
+    const total = Math.round((Utils.parseDate(g.target_date) - Utils.parseDate(start)) / 86400000);
+    if (!isFinite(total) || total <= 0) return null;
+    const elapsed = Utils.clamp(Math.round((Utils.parseDate(today) - Utils.parseDate(start)) / 86400000), 0, total);
+    const expected = Math.round(elapsed / total * 100);
+    const actual = Utils.clamp(Utils.num(g.progress), 0, 100);
+    const daysLeft = total - elapsed;
+    const monthsLeft = Math.max(1, Math.ceil(daysLeft / 30));
+    const needPerMonth = Math.ceil((100 - actual) / monthsLeft);
+    let state = 'ontrack';
+    if (actual < expected - 10) state = 'behind';
+    else if (actual < expected) state = 'slightly';
+    return { start, total, elapsed, expected, actual, daysLeft, monthsLeft, needPerMonth, state };
+  }
+};
+
 const Goals = {
   page(container) {
     const goals = App.state.goals || [];
@@ -104,6 +128,16 @@ const Goals = {
               ? `Tasks: ${prog.completed} completed · ${prog.remaining} remaining · ${icon('rotate', 'fa-xs')} sync sets % from tasks`
               : `Manual progress — set it with ${icon('pencil', 'fa-xs')} edit`}
           </div>
+          ${(() => {
+            const p = GoalPace.pace(g);
+            if (!p) return '';
+            const verdict = p.state === 'ontrack'
+              ? '<span style="color:var(--c-success,#10b981)">🎯 on track</span>'
+              : p.state === 'slightly'
+                ? '<span style="color:var(--c-warn,#f5c518)">⚠ slightly behind</span>'
+                : '<span style="color:var(--c-danger)">⚠ behind pace</span>';
+            return `<div class="muted small goal-pace">${icon('gauge-high')} Pace: expected ~${p.expected}% by now · you're at ${p.actual}% ${verdict} · need ~${p.needPerMonth}%/mo for ${p.monthsLeft} mo left</div>`;
+          })()}
         </div>
         ${children.map(c => this.goalCard(c, depth + 1)).join('')}
       </div>`;
