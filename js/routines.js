@@ -1,10 +1,106 @@
 /* ============================================================
-   PersonalOS — Routines (recurring daily schedules with day picker)
+   AluBhaiOS — Routines (recurring schedules + auto day tasks)
+   A routine with "auto day task" ON creates a real task on each
+   scheduled day (once per routine per date — ledger in Settings).
    ============================================================ */
 'use strict';
 
 const Routines = {
   dayTab: 'All',
+
+  /** stable link between a routine and its generated tasks */
+  marker(routineId) { return 'routine:' + routineId; },
+
+  /** does this routine cover the given weekday short name (Mon…Sun)? */
+  coversDay(r, wd) {
+    const days = String(r.days || 'Every day');
+    if (days === 'Every day') return true;
+    return days.split(',').map(s => s.trim()).includes(wd);
+  },
+
+  /** creation ledger: { routineId: { 'YYYY-MM-DD': true } } (Settings JSON) */
+  log() {
+    try { return JSON.parse(App.settings.routine_task_log || '{}'); } catch (e) { return {}; }
+  },
+
+  /** boot job — create today's auto day tasks (idempotent, never backfills past days). */
+  async ensureTodayTasks() {
+    if (!App.online) return;
+    const today = Utils.today();
+    const wd = Utils.weekdayShort(today);
+    const log = this.log();
+    const created = [];
+    let dirty = false;
+
+    for (const r of (App.state.routines || [])) {
+      if (r.enabled === false) continue;
+      if (!(r.auto_task === true || r.auto_task === 'true')) continue;
+      if (!this.coversDay(r, wd)) continue;
+
+      log[r.id] = log[r.id] || {};
+      if (log[r.id][today]) continue; // already handled this date — never duplicate
+      log[r.id][today] = true;
+      dirty = true;
+
+      // skip if a task for it already exists (e.g. made manually earlier today)
+      const exists = (App.state.tasks || []).some(t => !t._archived &&
+        t.project_id === this.marker(r.id) && String(t.scheduled_date || '').slice(0, 10) === today);
+      if (exists) continue;
+
+      try {
+        const rec = await API.createTask({
+          title: r.title,
+          description: '⏰ Auto from routine' + (r.target_time ? ' · ' + r.target_time : ''),
+          category: r.category || 'Other',
+          priority: 'medium',
+          scheduled_date: today,
+          estimated_minutes: Utils.num(r.duration_minutes) || '',
+          project_id: this.marker(r.id),
+          status: 'pending'
+        });
+        App.replaceRecord('tasks', rec);
+        created.push(r.title);
+      } catch (e) { console.warn('routine day-task creation failed for', r.title, e); }
+    }
+
+    if (dirty) {
+      App.settings.routine_task_log = JSON.stringify(log);
+      try { await API.saveSettings({ routine_task_log: App.settings.routine_task_log }); }
+      catch (e) { console.warn('routine task log save failed', e); }
+    }
+    if (created.length) {
+      toast(`🤖 ${created.length} routine task${created.length > 1 ? 's' : ''} created for today`, 'success');
+      App.refreshCurrent();
+    }
+  },
+
+  /** this week's dot strip for one routine (Mon→Sun, today highlighted). */
+  weekStrip(r) {
+    const today = Utils.today();
+    const ws = Utils.startOfWeek(today);
+    const log = this.log()[r.id] || {};
+    const cells = [];
+    for (let i = 0; i < 7; i++) {
+      const date = Utils.addDays(ws, i);
+      const wd = Utils.weekdayShort(date);
+      const isDay = this.coversDay(r, wd);
+      let cls = 'rt-dot' + (date === today ? ' today' : '');
+      let tip = wd + ' ' + date.slice(5);
+      if (!isDay) { cls += ' off'; tip += ' — not scheduled'; }
+      else {
+        const t = (App.state.tasks || []).find(x => !x._archived &&
+          x.project_id === this.marker(r.id) && String(x.scheduled_date || '').slice(0, 10) === date);
+        if (t && t.status === 'completed') { cls += ' done'; tip += ' — done ✓'; }
+        else if (t && date < today) { cls += ' miss'; tip += ' — missed'; }
+        else if (t) { cls += ' pend'; tip += ' — task pending'; }
+        else if (log[date]) { cls += ' off'; tip += ' — task removed'; }
+        else if (date === today) { tip += ' — no task yet'; }
+        else { cls += ' future'; tip += ' — upcoming'; }
+      }
+      cells.push(`<span class="${cls}" title="${Utils.esc(tip)}">${wd.slice(0, 2)}</span>`);
+    }
+    return `<div class="rt-week">${cells.join('')}</div>`;
+  },
 
   page(container) {
     container.innerHTML = `
@@ -30,6 +126,11 @@ const Routines = {
       if (act === 'toggle') this.toggleEnabled(r);
       if (act === 'edit') this.openForm(r);
       if (act === 'delete') this.remove(r);
+      if (act === 'tasks') {
+        Tasks.filter = { status: '', category: '', priority: '', goal: '', date: '', search: this.marker(r.id) };
+        location.hash = '#/tasks';
+        App.route();
+      }
     };
     this.renderList();
   },
@@ -53,7 +154,9 @@ const Routines = {
       return;
     }
 
-    list.innerHTML = items.map(r => `
+    list.innerHTML = items.map(r => {
+      const auto = r.auto_task === true || r.auto_task === 'true';
+      return `
       <div class="card routine-card ${r.enabled === false ? 'is-disabled' : ''}" data-id="${r.id}">
         <div class="routine-time-big">${Utils.esc(r.target_time || '--:--')}</div>
         <div class="task-main">
@@ -62,17 +165,21 @@ const Routines = {
             ${r.category ? chip(r.category, Utils.categoryColor(r.category)) : ''}
             ${r.duration_minutes ? chip(Utils.fmtMinutes(r.duration_minutes), '#64748b') : ''}
             ${chip(String(r.days || 'Every day'), '#8b5cf6')}
+            ${auto ? chip('🤖 Auto day task', '#10b981') : ''}
           </div>
           ${r.description ? `<div class="muted small">${Utils.esc(r.description)}</div>` : ''}
+          ${auto ? this.weekStrip(r) : ''}
         </div>
         <div class="task-actions">
           <label class="switch" title="Enable / disable">
             <input type="checkbox" data-routine-action="toggle" ${r.enabled !== false ? 'checked' : ''}><span></span>
           </label>
+          ${auto ? `<button class="btn btn-icon btn-ghost" data-routine-action="tasks" title="See this routine's auto tasks">${icon('calendar-check')}</button>` : ''}
           <button class="btn btn-icon btn-ghost" data-routine-action="edit" title="Edit">${icon('pencil')}</button>
           <button class="btn btn-icon btn-ghost danger" data-routine-action="delete" title="Delete">${icon('trash')}</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   },
 
   async toggleEnabled(r) {
@@ -118,6 +225,10 @@ const Routines = {
             <select name="category">${CONFIG.CATEGORIES.map(c => `<option ${r.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
           <label class="field"><span>Description</span>
             <textarea name="description" rows="2">${Utils.esc(r.description || '')}</textarea></label>
+          <label class="check-inline" style="margin:4px 0 10px">
+            <input type="checkbox" name="auto_task" ${(r.auto_task === true || r.auto_task === 'true') ? 'checked' : ''}>
+            🤖 Auto day task — a task is created automatically on each scheduled day
+          </label>
           <div class="field">
             <span>Days</span>
             <label class="check-inline"><input type="checkbox" id="day-every" ${every ? 'checked' : ''}> Every day</label>
@@ -153,7 +264,8 @@ const Routines = {
         category: fd.get('category'),
         target_time: fd.get('target_time') || '',
         duration_minutes: fd.get('duration_minutes') === '' ? '' : Utils.num(fd.get('duration_minutes')),
-        days: chosen.length === 7 ? 'Every day' : (chosen.length ? chosen.join(',') : 'Every day')
+        days: chosen.length === 7 ? 'Every day' : (chosen.length ? chosen.join(',') : 'Every day'),
+        auto_task: fd.get('auto_task') === 'on'
       };
       const save = existing ? API.updateRoutine(r.id, data) : API.createRoutine(data);
       save.then(rec => {

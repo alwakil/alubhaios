@@ -149,6 +149,8 @@ const App = {
         this.hideSetupBanner();
         this.updateUpgradeBanner();
         this.notifyMissed();
+        // auto day tasks from routines (idempotent — once per routine per date)
+        if (window.Routines && Routines.ensureTodayTasks) Routines.ensureTodayTasks().catch(() => {});
       }
     } catch (e) {
       this.online = false;
