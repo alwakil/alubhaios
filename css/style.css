@@ -1067,3 +1067,36 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 
 .routine-row.habit-stack { padding-left: 26px; }
 .routine-row.habit-stack .routine-name { color: var(--c-primary); }
+
+/* ---- v2.6.0: month calendar / morning briefing ---- */
+.cal-head { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 10px 14px; }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 8px 0 4px; }
+.cal-weekdays span { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted, #989da0); letter-spacing: 0.5px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-cell {
+  min-height: 78px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 5px 6px;
+  background: transparent;
+  color: var(--text, inherit);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+  display: flex; flex-direction: column; gap: 3px;
+  overflow: hidden;
+}
+.cal-cell:hover { border-color: var(--c-primary); transform: translateY(-1px); }
+.cal-cell.blank { border: 0; cursor: default; min-height: 0; }
+.cal-cell.today { border-color: var(--c-primary); box-shadow: 0 0 0 1px var(--c-primary); }
+.cal-daynum { font-size: 12px; font-weight: 800; }
+.cal-cell.today .cal-daynum { color: var(--c-primary); }
+.cal-item { font-size: 10px; line-height: 1.3; border-radius: 5px; padding: 1px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-item.pending { background: rgba(99, 102, 241, 0.15); color: var(--c-primary); }
+.cal-item.done { background: rgba(16, 185, 129, 0.15); color: var(--c-success, #10b981); font-weight: 700; }
+.cal-item.routine { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+.cal-item.more { color: var(--text-muted, #989da0); }
+
+.morning-brief { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; padding: 12px 14px; }
+.morning-brief .insight-card { margin: 0; }

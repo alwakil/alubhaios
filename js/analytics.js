@@ -549,6 +549,10 @@ const AnalyticsPage = {
           <div class="chart-box"><canvas id="an-weekly"></canvas></div>
         </div>
         <div class="card chart-card">
+          <h3 class="card-title">XP growth — last 12 weeks</h3>
+          <div class="chart-box"><canvas id="an-xp-growth"></canvas></div>
+        </div>
+        <div class="card chart-card">
           <h3 class="card-title">Productive time by category</h3>
           <div class="chart-box"><canvas id="an-categories"></canvas></div>
         </div>
@@ -581,6 +585,7 @@ const AnalyticsPage = {
     this.tasksChart('an-tasks', daily);
     this.habitsChart('an-habits', daily);
     this.weeklyChart('an-weekly', weeks);
+    this.xpGrowthChart('an-xp-growth');
     Dashboard.categoryChart('an-categories', Analytics.productiveCategoryDistribution(r), r);
     this.plannedActualChart('an-planned-actual', daily);
     Dashboard.focusDistractionChart('an-focus-distraction', daily);
@@ -797,6 +802,30 @@ const AnalyticsPage = {
           <b>${lastXp}</b></div>
         <div class="arena-verdict ${cls}">${verdict}</div>
       </div>`;
+  },
+
+  /** 📈 cumulative XP curve — last 12 weeks. */
+  xpGrowthChart(canvasId) {
+    const series = Gamify.xpGrowthSeries(12);
+    const has = series.some(s => s.xp > 0);
+    if (!has) return Charts.emptyBox(canvasId, 'Earn XP to see your growth curve.');
+    Charts.make(canvasId, {
+      type: 'line',
+      data: {
+        labels: series.map(s => s.weekStart.slice(5)),
+        datasets: [{
+          label: 'Total XP',
+          data: series.map(s => s.xp),
+          borderColor: '#f5c518',
+          backgroundColor: 'rgba(245, 197, 24, 0.12)',
+          fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2
+        }]
+      },
+      options: Charts.lineOpts({
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.raw} XP total` } } },
+        scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
+      })
+    });
   },
 
   planningCard() {

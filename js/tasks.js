@@ -7,6 +7,8 @@ const Tasks = {
   filter: { status: '', category: '', priority: '', goal: '', date: '', search: '' },
   showArchived: false,
   view: 'list',
+  calY: null,
+  calM: null,
 
   page(container) {
     const f = this.filter;
@@ -21,6 +23,7 @@ const Tasks = {
             <button class="${this.view === 'list' ? 'on' : ''}" data-act="view-list" title="List view">${icon('list')} List</button>
             <button class="${this.view === 'projects' ? 'on' : ''}" data-act="view-projects" title="Group by project">${icon('folder-tree')} Projects</button>
             <button class="${this.view === 'matrix' ? 'on' : ''}" data-act="view-matrix" title="Eisenhower matrix — urgent × important">${icon('table-cells-large')} Matrix</button>
+            <button class="${this.view === 'calendar' ? 'on' : ''}" data-act="view-calendar" title="Month calendar">${icon('calendar-days')} Calendar</button>
           </div>
           <button class="btn btn-primary" data-act="new">${icon('plus')} New task</button>
         </div>
@@ -68,6 +71,7 @@ const Tasks = {
       if (e.target.closest('[data-act="view-list"]')) { this.view = 'list'; return this.page(container); }
       if (e.target.closest('[data-act="view-projects"]')) { this.view = 'projects'; return this.page(container); }
       if (e.target.closest('[data-act="view-matrix"]')) { this.view = 'matrix'; return this.page(container); }
+      if (e.target.closest('[data-act="view-calendar"]')) { this.view = 'calendar'; return this.page(container); }
       if (e.target.closest('[data-act="clear-filters"]')) {
         this.filter = { status: '', category: '', priority: '', goal: '', date: '', search: '' };
         return this.page(container);
@@ -93,7 +97,102 @@ const Tasks = {
   renderCurrentView() {
     if (this.view === 'projects') return this.renderProjects();
     if (this.view === 'matrix') return this.renderMatrix();
+    if (this.view === 'calendar') return this.renderCalendar();
     this.renderList();
+  },
+
+  /** 📅 month view helpers — pure date math (testable). */
+  monthDates(y, m) {
+    // array for one calendar month: null = leading blank, else 'YYYY-MM-DD'
+    const startDow = (new Date(y, m, 1).getDay() + 6) % 7; // Mon=0
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const out = [];
+    for (let i = 0; i < startDow; i++) out.push(null);
+    for (let d = 1; d <= daysInMonth; d++) out.push(`${y}-${Utils.pad(m + 1)}-${Utils.pad(d)}`);
+    return out;
+  },
+  dayItems(date) {
+    const tasks = (App.state.tasks || []).filter(t => !t._archived && String(t.scheduled_date || '').slice(0, 10) === date);
+    const wd = Utils.weekdayShort(date);
+    const routines = (App.state.routines || []).filter(r => r.enabled !== false && (typeof Routines !== 'undefined' ? Routines.coversDay(r, wd) : String(r.days || '') === 'Every day'));
+    return { tasks, routines };
+  },
+
+  /** 📅 month calendar view — tasks + routine days on a real grid. */
+  renderCalendar() {
+    const list = qs('#task-list', App.container());
+    if (!list) return;
+    if (this.calY === null || this.calY === undefined) {
+      const d = Utils.parseDate(Utils.today());
+      this.calY = d.getFullYear(); this.calM = d.getMonth();
+    }
+    const today = Utils.today();
+    const first = new Date(this.calY, this.calM, 1);
+    const monthName = first.toLocaleString('en-us', { month: 'long' });
+    const byDate = {};
+    (App.state.tasks || []).forEach(t => {
+      if (t._archived) return;
+      const d = String(t.scheduled_date || '').slice(0, 10);
+      if (d) (byDate[d] = byDate[d] || []).push(t);
+    });
+
+    const cells = this.monthDates(this.calY, this.calM).map(date => {
+      if (!date) return '<div class="cal-cell blank"></div>';
+      const wd = Utils.weekdayShort(date);
+      const tasks = byDate[date] || [];
+      const pend = tasks.filter(t => t.status !== 'completed');
+      const doneN = tasks.length - pend.length;
+      const rtN = (App.state.routines || []).filter(r => r.enabled !== false && (typeof Routines !== 'undefined' ? Routines.coversDay(r, wd) : String(r.days || '') === 'Every day')).length;
+      const items = [];
+      if (doneN) items.push(`<div class="cal-item done">✓ ${doneN} done</div>`);
+      pend.slice(0, 2).forEach(t => items.push(`<div class="cal-item pending">${Utils.esc(t.title)}</div>`));
+      if (rtN) items.push(`<div class="cal-item routine">⏰ ${rtN} routine${rtN > 1 ? 's' : ''}</div>`);
+      const extra = tasks.length + rtN - items.length;
+      if (extra > 0) items.push(`<div class="cal-item more">+${extra} more</div>`);
+      return `
+        <button type="button" class="cal-cell${date === today ? ' today' : ''}${tasks.length || rtN ? ' has-items' : ''}" data-cal-day="${date}" title="Open ${date}">
+          <span class="cal-daynum">${Number(date.slice(8))}</span>
+          ${items.join('')}
+        </button>`;
+    }).join('');
+
+    list.innerHTML = `
+      <div class="card cal-head">
+        <button class="btn btn-icon btn-ghost" data-cal-nav="prev" title="Previous month">${icon('chevron-left')}</button>
+        <b>${monthName} ${this.calY}</b>
+        <button class="btn btn-icon btn-ghost" data-cal-nav="next" title="Next month">${icon('chevron-right')}</button>
+        <button class="btn btn-ghost btn-sm" data-cal-nav="today">Today</button>
+      </div>
+      <div class="cal-weekdays">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => `<span>${w}</span>`).join('')}</div>
+      <div class="cal-grid">${cells}</div>
+      <p class="muted small" style="margin-top:10px">Tap a day to see its tasks and routines · ✓ = completed · ⏰ = routine day.</p>`;
+
+    list.onclick = e => {
+      const nav = e.target.closest('[data-cal-nav]');
+      if (nav) {
+        if (nav.dataset.calNav === 'today') { const d = Utils.parseDate(today); this.calY = d.getFullYear(); this.calM = d.getMonth(); }
+        else if (nav.dataset.calNav === 'prev') { this.calM--; if (this.calM < 0) { this.calM = 11; this.calY--; } }
+        else { this.calM++; if (this.calM > 11) { this.calM = 0; this.calY++; } }
+        return this.renderCalendar();
+      }
+      const dayBtn = e.target.closest('[data-cal-day]');
+      if (dayBtn) return this.showDayModal(dayBtn.dataset.calDay);
+    };
+  },
+
+  showDayModal(date) {
+    const { tasks, routines } = this.dayItems(date);
+    const doneN = tasks.filter(t => t.status === 'completed').length;
+    openModal({
+      title: icon('calendar-days') + ' ' + Utils.fmtDay(date),
+      body: `
+        <div class="stack">
+          <div class="section-subhead">Routines</div>
+          ${routines.length ? routines.map(r => `<div class="muted">⏰ ${Utils.esc(r.target_time || '')} — ${Utils.esc(r.title)}</div>`).join('') : '<p class="muted small">None on this day.</p>'}
+          <div class="section-subhead">Tasks (${doneN}/${tasks.length} done)</div>
+          ${tasks.length ? tasks.map(t => `<div class="muted">${t.status === 'completed' ? '✓' : '○'} ${Utils.esc(t.title)} ${chip(t.priority || 'medium', Utils.priorityColor(t.priority))}</div>`).join('') : '<p class="muted small">No tasks on this day.</p>'}
+        </div>`
+    });
   },
 
   /** 📊 Eisenhower matrix — pending tasks split on urgent (due ≤ tomorrow,

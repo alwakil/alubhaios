@@ -217,6 +217,8 @@ const Dashboard = {
         <p class="muted">${Utils.fmtDay(today)} — plan the day, then work the plan.</p>
       </div>
 
+      <div class="card morning-brief" id="today-brief"></div>
+
       ${missed.length ? `
       <div class="card missed-alert">
         <div class="missed-head">
@@ -280,6 +282,11 @@ const Dashboard = {
       </div>
     `;
 
+    // 🌅 morning briefing
+    const brief = this.morningBriefing(tasksToday, routines, today);
+    qs('#today-brief', container).innerHTML = brief.map(i =>
+      `<div class="insight-card tone-${i.tone}">${icon(i.icon)}<span>${Utils.esc(i.text)}</span></div>`).join('');
+
     // top 3 priorities (frog gets its badge here too)
     const frog = this.frogTask(tasksToday);
     qs('#today-top3', container).innerHTML = top3.length
@@ -291,7 +298,7 @@ const Dashboard = {
     const entries = this.todayTimelineEntries(routines, tasksToday, nowMin);
     const routineEntries = entries.filter(e => e.kind === 'routine');
     const tasksEntry = entries.find(e => e.kind === 'tasks');
-    const stackMap = (window.Habits && Habits.habitStack) ? Habits.habitStack() : {};
+    const stackMap = (typeof Habits !== 'undefined' && Habits.habitStack) ? Habits.habitStack() : {};
     const stackedFor = routineId => (App.state.habits || []).filter(h =>
       h.enabled !== false && stackMap[h.id] === routineId && !Analytics.habitDates(h.id).has(today));
     qs('#today-routines', container).innerHTML = routineEntries.length
@@ -357,6 +364,33 @@ const Dashboard = {
     container.onclick = e => this.onClick(e);
   },
 
+  /** 🌅 Morning briefing — one glance at the whole day, from real data.
+      Pure builder (testable). Returns [{icon, tone, text}]. */
+  morningBriefing(tasksToday, routines, today) {
+    const lines = [];
+    const pend = tasksToday.filter(t => t.status !== 'completed');
+    lines.push({
+      icon: 'list-check', tone: 'info',
+      text: `${tasksToday.length} task${tasksToday.length !== 1 ? 's' : ''} today (${pend.length} pending) · ${routines.length} routine${routines.length !== 1 ? 's' : ''}`
+    });
+    const frog = this.frogTask(tasksToday);
+    if (frog) lines.push({ icon: 'fire', tone: 'warn', text: `🐸 Eat the frog first: ${frog.title}` });
+    const qw = pend.filter(t => Utils.num(t.estimated_minutes) > 0 && Utils.num(t.estimated_minutes) <= 5).length;
+    if (qw) lines.push({ icon: 'bolt', tone: 'info', text: `⚡ ${qw} quick win${qw > 1 ? 's' : ''} under 5 min — clear them in one burst.` });
+    let bestR = null, bestS = 0;
+    routines.forEach(r => {
+      const s = (typeof Routines !== 'undefined' && Routines.routineStreak) ? Routines.routineStreak(r) : 0;
+      if (s > bestS) { bestS = s; bestR = r; }
+    });
+    if (bestS >= 2) lines.push({ icon: 'fire', tone: 'good', text: `🔥 "${bestR.title}" is on a ${bestS}-day streak — don't break the chain.` });
+    (App.state.goals || []).forEach(g => {
+      if (g.status !== 'active') return;
+      const p = (typeof GoalPace !== 'undefined' && GoalPace.pace) ? GoalPace.pace(g) : null;
+      if (p && p.state === 'behind') lines.push({ icon: 'gauge-high', tone: 'warn', text: `⚠ "${g.title}" is behind pace — needs ~${p.needPerMonth}%/mo (${p.daysLeft}d left).` });
+    });
+    return lines;
+  },
+
   /** 🐸 Eat the Frog — the day's hardest open task: highest priority,
       then longest estimate, then oldest. Pure (testable). */
   frogTask(tasksToday) {
@@ -385,7 +419,7 @@ const Dashboard = {
         if (end < nowMin) state = 'past';
         else if (mins <= nowMin) state = 'now';
       }
-      const streak = (window.Routines && Routines.routineStreak) ? Routines.routineStreak(r) : 0;
+      const streak = (typeof Routines !== 'undefined' && Routines.routineStreak) ? Routines.routineStreak(r) : 0;
       return { kind: 'routine', routineId: r.id, time: tp || '--:--', mins: mins === null ? 9999 : mins, title: r.title, dur: Utils.num(r.duration_minutes), state, streak };
     }).sort((a, b) => a.mins - b.mins);
     const pend = tasksToday.filter(t => t.status !== 'completed');

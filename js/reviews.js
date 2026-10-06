@@ -24,10 +24,77 @@ const Reviews = {
       if (tab) { this.tab = tab.dataset.tab; return this.page(container); }
       const printBtn = e.target.closest('#wr-print');
       if (printBtn) { window.print(); return; }
+      const shareBtn = e.target.closest('#wr-share');
+      if (shareBtn) { this.openShareCard(avgScore, sum('focusMinutes'), sum('tasksCompleted'), habitPct, weekStart, weekEnd); return; }
       this.handleAction(e);
     };
     if (this.tab === 'daily') this.renderDaily(qs('#review-body', container));
     else this.renderWeekly(qs('#review-body', container));
+  },
+
+  /** 📸 shareable weekly report data (pure-ish, testable). */
+  shareCardData(weekStart, weekEnd) {
+    const days = [];
+    for (let i = 0; i < 7; i++) days.push(Analytics.dayStat(Utils.addDays(weekStart, i)));
+    const active = days.filter(d => d.active);
+    const avgScore = active.length ? Math.round(active.reduce((a, d) => a + d.score, 0) / active.length) : 0;
+    const focusMin = days.reduce((a, d) => a + d.focusMinutes, 0);
+    const tasksDone = days.reduce((a, d) => a + d.tasksCompleted, 0);
+    const habitPct = Math.round(days.reduce((a, d) => a + d.habitDone, 0) / Math.max(1, days.reduce((a, d) => a + d.habitTotal, 0)) * 100);
+    const xp = (typeof Gamify !== 'undefined' && Gamify.xpBetween) ? Gamify.xpBetween(weekStart, weekEnd) : 0;
+    const level = (typeof Gamify !== 'undefined' && Gamify.level) ? Gamify.level(Gamify.xp()).level : 1;
+    const bestStreak = (App.state.habits || []).reduce((a, h) => Math.max(a, Analytics.habitStreaks(h.id).best), 0);
+    return { avgScore, focusMin, tasksDone, habitPct, xp, level, bestStreak };
+  },
+
+  /** draw the 1000×620 share card on a canvas and open a download modal */
+  openShareCard(avgScore, focusMin, tasksDone, habitPct, weekStart, weekEnd) {
+    const d = this.shareCardData(weekStart, weekEnd);
+    const c = document.createElement('canvas');
+    c.width = 1000; c.height = 620;
+    const x = c.getContext('2d');
+    const bg = x.createLinearGradient(0, 0, 1000, 620);
+    bg.addColorStop(0, '#1b1d21'); bg.addColorStop(1, '#26282d');
+    x.fillStyle = bg; x.fillRect(0, 0, 1000, 620);
+    x.fillStyle = '#6366f1'; x.fillRect(0, 0, 1000, 8);
+    x.fillStyle = '#f5c518'; x.font = 'bold 42px sans-serif'; x.fillText('AluBhaiOS', 60, 92);
+    x.fillStyle = '#989da0'; x.font = '20px sans-serif';
+    x.fillText(String(weekStart).split('-').reverse().join('/') + ' — ' + String(weekEnd).split('-').reverse().join('/'), 60, 126);
+    // productivity ring
+    x.lineWidth = 18; x.strokeStyle = 'rgba(154, 158, 166, 0.18)';
+    x.beginPath(); x.arc(230, 330, 112, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = '#10b981';
+    x.beginPath(); x.arc(230, 330, 112, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (d.avgScore / 100)); x.stroke();
+    x.fillStyle = '#ffffff'; x.font = 'bold 64px sans-serif'; x.textAlign = 'center';
+    x.fillText(String(d.avgScore), 230, 348);
+    x.fillStyle = '#989da0'; x.font = '18px sans-serif';
+    x.fillText('avg productivity', 230, 384);
+    x.textAlign = 'left';
+    // stat rows
+    const stats = [
+      ['⏱ Focus time', Utils.fmtMinutes(d.focusMin)],
+      ['✅ Tasks done', String(d.tasksDone)],
+      ['🔥 Habit consistency', d.habitPct + '%'],
+      ['⚡ XP this week', String(d.xp)],
+      ['🏅 Level', 'Lv ' + d.level + ' · best streak ' + d.bestStreak + 'd']
+    ];
+    stats.forEach((s2, i) => {
+      const y = 240 + i * 78;
+      x.fillStyle = 'rgba(154, 158, 166, 0.10)';
+      if (x.roundRect) { x.beginPath(); x.roundRect(450, y - 40, 490, 62, 12); x.fill(); }
+      else x.fillRect(450, y - 40, 490, 62);
+      x.fillStyle = '#989da0'; x.font = '20px sans-serif'; x.fillText(s2[0], 480, y);
+      x.fillStyle = '#ffffff'; x.font = 'bold 30px sans-serif'; x.textAlign = 'right'; x.fillText(s2[1], 910, y);
+      x.textAlign = 'left';
+    });
+    x.fillStyle = '#989da0'; x.font = '16px sans-serif';
+    x.fillText('built with AluBhaiOS — plan · execute · measure · improve', 60, 586);
+    const url = c.toDataURL('image/png');
+    openModal({
+      title: icon('share-nodes') + ' Weekly share card',
+      body: `<img src="${url}" alt="Weekly report card" style="width:100%;border-radius:12px;border:1px solid var(--border)">`,
+      footer: `<a class="btn btn-primary" download="alubhaios-week-${weekStart}.png" href="${url}">${icon('download')} Download PNG</a>`
+    });
   },
 
   handleAction(e) {
@@ -257,7 +324,10 @@ const Reviews = {
       <div class="card wr-report">
         <div class="wr-report-head">
           <h3 class="card-title">${icon('chart-line')} Auto weekly report</h3>
-          <button class="btn btn-sm" id="wr-print">${icon('print')} Print</button>
+          <div class="form-actions" style="margin:0">
+            <button class="btn btn-sm" id="wr-share">${icon('share-nodes')} Share card</button>
+            <button class="btn btn-sm" id="wr-print">${icon('print')} Print</button>
+          </div>
         </div>
         <div class="wr-delta-grid">
           ${deltaChip('Avg productivity', avgScore, pAvgScore, v => v)}

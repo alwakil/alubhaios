@@ -39,6 +39,30 @@ const Routines = {
     } catch (e) { App.handleError(e); return false; }
   },
 
+  /** 📊 30-day consistency for an auto routine: completion % over its
+      scheduled days + the most-missed weekday. Pure (testable). */
+  routineStats(r, days = 30) {
+    const marker = this.marker(r.id);
+    let scheduled = 0, completed = 0;
+    const missByWd = {};
+    for (let i = 0; i < days; i++) {
+      const date = Utils.addDays(Utils.today(), -i);
+      if (!this.coversDay(r, Utils.weekdayShort(date))) continue;
+      scheduled++;
+      const t = (App.state.tasks || []).find(x => !x._archived && x.project_id === marker &&
+        String(x.scheduled_date || '').slice(0, 10) === date);
+      if (t && t.status === 'completed') completed++;
+      else if (date < Utils.today()) {
+        const wd = Utils.weekdayShort(date);
+        missByWd[wd] = (missByWd[wd] || 0) + 1;
+      }
+    }
+    const pct = scheduled ? Math.round(completed / scheduled * 100) : null;
+    let mostMissed = null, mx = 0;
+    Object.keys(missByWd).forEach(w => { if (missByWd[w] > mx) { mx = missByWd[w]; mostMissed = w; } });
+    return { scheduled, completed, pct, mostMissed, missedCount: mx };
+  },
+
   /** 🔥 current streak: consecutive completed scheduled days walking back
       from today. Today completed counts; today pending/missing = grace. */
   routineStreak(r) {
@@ -160,12 +184,14 @@ const Routines = {
     const pct = scheduled ? Math.round(done / scheduled * 100) : 0;
     const cur = this.routineStreak(r), best = this.routineBestStreak(r);
     const streakTxt = (cur > 0 || best > 0) ? ` · 🔥 ${cur}d streak (best ${best}d)` : '';
+    const st30 = this.routineStats(r, 30);
+    const statsTxt = st30.pct !== null ? ` · 📊 30d: ${st30.pct}% done${st30.mostMissed ? ` · most missed: ${st30.mostMissed}` : ''}` : '';
     return `
       <div class="rt-week" title="This week — tap a day dot">
         <div class="rt-track-wrap"><div class="rt-track" style="width:${pct}%"></div></div>
         ${cells.join('')}
       </div>
-      <div class="rt-week-meta muted small">${done}/${scheduled} scheduled days done this week${pct === 100 && scheduled ? ' — 🏆 perfect!' : ''}${streakTxt}</div>`;
+      <div class="rt-week-meta muted small">${done}/${scheduled} scheduled days done this week${pct === 100 && scheduled ? ' — 🏆 perfect!' : ''}${streakTxt}${statsTxt}</div>`;
   },
 
   /** dot click: task exists → view in Tasks; scheduled day without task →

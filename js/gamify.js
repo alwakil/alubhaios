@@ -121,6 +121,21 @@ const Gamify = {
     return Math.max(0, b.tasks + b.habits + b.focus + b.dailyReviews + b.weeklyReviews + b.ctf + b.salah - b.penalty);
   },
 
+  /** 📈 cumulative XP per week for the last N weeks (oldest first) —
+      feeds the XP growth chart. */
+  xpGrowthSeries(weeks) {
+    const ws0 = Utils.startOfWeek(Utils.today());
+    const out = [];
+    let cum = 0;
+    for (let i = weeks - 1; i >= 0; i--) {
+      const ws = Utils.addDays(ws0, -7 * i);
+      const we = Utils.addDays(ws, 6);
+      cum += this.xpBetween(ws, we);
+      out.push({ weekStart: ws, xp: cum });
+    }
+    return out;
+  },
+
   /** XP earned strictly between two dates (inclusive, YYYY-MM-DD) —
       same multipliers as xpBreakdown, but range-filtered for the
       weekly XP battle. */
