@@ -168,10 +168,15 @@ const Tasks = {
       const g = groups[key];
       const done = g.filter(t => t.status === 'completed').length;
       const pct = Utils.pct(done, g.length);
+      // routine markers get their real routine name as the group label
+      const label = key.startsWith('routine:')
+        ? '⏰ ' + (((App.state.routines || []).find(r => r.id === key.slice(8)) || {}).title || 'routine')
+        : key;
+      const labelIcon = key === 'No project' ? icon('inbox') : key.startsWith('routine:') ? icon('clock-rotate-left') : icon('folder-open');
       return `
       <div class="project-group">
         <div class="project-head">
-          <span class="project-name">${key === 'No project' ? icon('inbox') : icon('folder-open')} ${Utils.esc(key)}</span>
+          <span class="project-name">${labelIcon} ${Utils.esc(label)}</span>
           <span class="muted small">${done}/${g.length} done</span>
           <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
           <b class="small">${pct}%</b>
@@ -258,7 +263,15 @@ const Tasks = {
             ${t.scheduled_date ? chip(overdue ? 'overdue' : Utils.fmtDate(t.scheduled_date), overdue ? '#ef4444' : '#64748b') : ''}
             ${t.estimated_minutes ? chip('est ' + Utils.fmtMinutes(t.estimated_minutes), '#64748b') : ''}
             ${t.actual_minutes ? chip('actual ' + Utils.fmtMinutes(t.actual_minutes), '#10b981') : ''}
-            ${t.project_id ? chip('📂 ' + t.project_id, '#8b5cf6') : ''}
+            ${(() => {
+              if (!t.project_id) return '';
+              // auto routine tasks: show the routine's NAME, never the raw marker id
+              if (t.project_id.startsWith('routine:')) {
+                const rt = (App.state.routines || []).find(r => r.id === t.project_id.slice(8));
+                return rt ? chip('⏰ ' + rt.title, '#0ea5e9') : chip('⏰ routine', '#8b5cf6');
+              }
+              return chip('📂 ' + t.project_id, '#8b5cf6');
+            })()}
             ${goal ? chip('🎯 ' + goal.title, 'var(--c-primary)') : ''}
           </div>
         </div>
