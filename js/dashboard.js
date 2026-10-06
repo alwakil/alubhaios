@@ -246,6 +246,12 @@ const Dashboard = {
 
       <div class="card morning-plan">
         <h3 class="card-title">${icon('mug-hot')} Morning plan</h3>
+        ${(() => {
+          const frog = this.frogTask(tasksToday);
+          if (frog) return `<div class="frog-banner"><span class="frog-emoji">🐸</span><div><b>Eat the frog:</b> ${Utils.esc(frog.title)}${Utils.num(frog.estimated_minutes) ? ` (${Utils.fmtMinutes(frog.estimated_minutes)})` : ''}<div class="muted small">Hardest task first — then the whole day feels lighter. <a class="link" href="#/focus">Start focus ${icon('arrow-right', 'fa-xs')}</a></div></div></div>`;
+          if (tasksToday.some(t => t.status === 'completed')) return `<div class="frog-banner frog-done"><span class="frog-emoji">🏆</span><div><b>Frog eaten!</b> The hardest is behind you — the rest of the day is downhill.</div></div>`;
+          return '';
+        })()}
         <div class="section-subhead">Top priorities</div>
         <div id="today-top3"></div>
         <div class="section-subhead">Scheduled routines — ${Utils.esc(wd)}</div>
@@ -274,16 +280,20 @@ const Dashboard = {
       </div>
     `;
 
-    // top 3 priorities
+    // top 3 priorities (frog gets its badge here too)
+    const frog = this.frogTask(tasksToday);
     qs('#today-top3', container).innerHTML = top3.length
-      ? `<ol class="priority-list">${top3.map(t => `<li><span class="pl-title">${Utils.esc(t.title)}</span>${chip(t.priority, Utils.priorityColor(t.priority))}</li>`).join('')}</ol>`
+      ? `<ol class="priority-list">${top3.map(t => `<li><span class="pl-title">${Utils.esc(t.title)}</span>${t.id === (frog && frog.id) ? chip('🐸 frog', '#f97316') : ''}${chip(t.priority, Utils.priorityColor(t.priority))}</li>`).join('')}</ol>`
       : `<p class="muted">No open priorities today — add tasks or enjoy the clear runway.</p>`;
 
-    // routines timeline — UPGRADED: past/now/upcoming states + streak chips + anytime tasks
+    // routines timeline — UPGRADED: past/now/upcoming states + streak chips + habit stacks + anytime tasks
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     const entries = this.todayTimelineEntries(routines, tasksToday, nowMin);
     const routineEntries = entries.filter(e => e.kind === 'routine');
     const tasksEntry = entries.find(e => e.kind === 'tasks');
+    const stackMap = (window.Habits && Habits.habitStack) ? Habits.habitStack() : {};
+    const stackedFor = routineId => (App.state.habits || []).filter(h =>
+      h.enabled !== false && stackMap[h.id] === routineId && !Analytics.habitDates(h.id).has(today));
     qs('#today-routines', container).innerHTML = routineEntries.length
       ? `<div class="routine-timeline">${routineEntries.map(e => `
           <div class="routine-row ${e.state}">
@@ -293,7 +303,14 @@ const Dashboard = {
             ${e.dur ? `<span class="muted">${Utils.fmtMinutes(e.dur)}</span>` : ''}
             ${e.streak > 0 ? chip('🔥 ' + e.streak + 'd', '#f97316') : ''}
             ${e.state === 'now' ? chip('NOW', 'var(--c-primary)') : ''}
-          </div>`).join('')}
+          </div>
+          ${stackedFor(e.routineId).map(h => `
+          <div class="routine-row habit-stack">
+            <span class="routine-time">↳</span>
+            <span class="routine-dot"></span>
+            <span class="routine-name">🔗 ${Utils.esc(h.title)}</span>
+            <button class="btn btn-sm" data-habit="${h.id}" title="Mark habit done">${icon('check')} done</button>
+          </div>`).join('')}`).join('')}
         <div class="routine-row anytime">
           <span class="routine-time">${icon('list-check')}</span>
           <span class="routine-dot"></span>
@@ -340,6 +357,19 @@ const Dashboard = {
     container.onclick = e => this.onClick(e);
   },
 
+  /** 🐸 Eat the Frog — the day's hardest open task: highest priority,
+      then longest estimate, then oldest. Pure (testable). */
+  frogTask(tasksToday) {
+    const open = tasksToday.filter(t => t.status !== 'completed');
+    if (!open.length) return null;
+    const rank = { high: 0, medium: 1, low: 2 };
+    return open.slice().sort((a, b) =>
+      (rank[a.priority || 'medium'] - rank[b.priority || 'medium']) ||
+      (Utils.num(b.estimated_minutes) - Utils.num(a.estimated_minutes)) ||
+      String(a.created_at || '').localeCompare(String(b.created_at || ''))
+    )[0];
+  },
+
   /** Day timeline builder — pure (testable). Routines sorted by time with
       past/now/upcoming state + streaks; one "anytime tasks" entry appended. */
   todayTimelineEntries(routines, tasksToday, nowMin) {
@@ -356,7 +386,7 @@ const Dashboard = {
         else if (mins <= nowMin) state = 'now';
       }
       const streak = (window.Routines && Routines.routineStreak) ? Routines.routineStreak(r) : 0;
-      return { kind: 'routine', time: tp || '--:--', mins: mins === null ? 9999 : mins, title: r.title, dur: Utils.num(r.duration_minutes), state, streak };
+      return { kind: 'routine', routineId: r.id, time: tp || '--:--', mins: mins === null ? 9999 : mins, title: r.title, dur: Utils.num(r.duration_minutes), state, streak };
     }).sort((a, b) => a.mins - b.mins);
     const pend = tasksToday.filter(t => t.status !== 'completed');
     const doneCount = tasksToday.length - pend.length;

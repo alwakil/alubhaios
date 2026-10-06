@@ -16,7 +16,7 @@ const CONFIG = {
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHFrbHlzcnN2eWx5enhwa3VyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzEwNTcsImV4cCI6MjEwNjYwNzA1N30.lDqj65ezE5N38YxzKgNMhpiqJ-b_q5pHQROilyIUmbU",
 
   APP_NAME: "AluBhaiOS",
-  VERSION: "2.4.0",
+  VERSION: "2.5.0",
 
   CATEGORIES: ["Learning", "Projects", "Work", "Personal", "Entertainment", "Other"],
   // Sessions in these categories count as "distraction time", not focus time.

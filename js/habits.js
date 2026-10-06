@@ -57,6 +57,7 @@ const Habits = {
           <div class="habit-title">${icon('fire', 'fa-xs fire-ic')} ${Utils.esc(h.title)}</div>
           <div class="task-meta">
             ${chip(h.frequency || 'daily', '#8b5cf6')}
+            ${(() => { const sid = this.stackAfter(h); if (!sid) return ''; const rt = (App.state.routines || []).find(x => x.id === sid); return rt ? chip('🔗 after ' + rt.title, '#0ea5e9') : ''; })()}
             ${h.target ? chip('target ' + h.target + '/period', '#64748b') : ''}
             ${h.enabled === false ? chip('disabled', '#64748b') : ''}
           </div>
@@ -154,8 +155,25 @@ const Habits = {
     } catch (e) { App.handleError(e); }
   },
 
+  /** 🔗 habit stacking (BJ Fogg): habit → anchor routine. Stored in
+      Settings JSON 'habit_stack' ({habitId: routineId}) — the habits
+      table has no such column (PGRST204 lesson applied). */
+  habitStack() {
+    try { return JSON.parse(App.settings.habit_stack || '{}'); } catch (e) { return {}; }
+  },
+  stackAfter(h) { return this.habitStack()[h.id] || ''; },
+  async setStack(habitId, routineId) {
+    const map = this.habitStack();
+    if (routineId) map[habitId] = routineId; else delete map[habitId];
+    App.settings.habit_stack = JSON.stringify(map);
+    try { await API.saveSettings({ habit_stack: App.settings.habit_stack }); return true; }
+    catch (e) { App.handleError(e); return false; }
+  },
+
   openForm(existing) {
     const h = existing || {};
+    const routines = App.state.routines || [];
+    const currentStack = h.id ? this.stackAfter(h) : '';
     const m = openModal({
       title: existing ? 'Edit habit' : 'New habit',
       body: `
@@ -170,6 +188,13 @@ const Habits = {
             <label class="field"><span>Target (per period)</span>
               <input type="number" min="1" name="target" value="${Utils.esc(h.target || 1)}"></label>
           </div>
+          <label class="field"><span>🔗 Stack after routine (habit stacking)</span>
+            <select name="stack_after">
+              <option value="">— none —</option>
+              ${routines.map(rt => `<option value="${rt.id}" ${currentStack === rt.id ? 'selected' : ''}>${Utils.esc(rt.title)}</option>`).join('')}
+            </select>
+            <span class="muted small">Science hack: attach this habit right after an existing routine — it becomes much easier to keep.</span>
+          </label>
           <p class="muted small">Editing a habit never breaks its history — streaks are always recalculated from the completion logs.</p>
         </form>`,
       footer: `
@@ -186,9 +211,11 @@ const Habits = {
         frequency: fd.get('frequency'),
         target: Utils.num(fd.get('target')) || 1
       };
+      const stackTo = fd.get('stack_after') || '';
       const save = existing ? API.updateHabit(h.id, data) : API.createHabit(data);
-      save.then(rec => {
+      save.then(async rec => {
         App.replaceRecord('habits', rec);
+        await this.setStack(rec.id, stackTo);
         m.close();
         App.refreshCurrent();
         toast(existing ? 'Habit updated' : 'Habit created', 'success');

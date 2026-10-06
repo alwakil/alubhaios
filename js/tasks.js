@@ -20,6 +20,7 @@ const Tasks = {
           <div class="seg">
             <button class="${this.view === 'list' ? 'on' : ''}" data-act="view-list" title="List view">${icon('list')} List</button>
             <button class="${this.view === 'projects' ? 'on' : ''}" data-act="view-projects" title="Group by project">${icon('folder-tree')} Projects</button>
+            <button class="${this.view === 'matrix' ? 'on' : ''}" data-act="view-matrix" title="Eisenhower matrix — urgent × important">${icon('table-cells-large')} Matrix</button>
           </div>
           <button class="btn btn-primary" data-act="new">${icon('plus')} New task</button>
         </div>
@@ -66,6 +67,7 @@ const Tasks = {
       if (e.target.closest('[data-act="toggle-archived"]')) { this.showArchived = !this.showArchived; return this.page(container); }
       if (e.target.closest('[data-act="view-list"]')) { this.view = 'list'; return this.page(container); }
       if (e.target.closest('[data-act="view-projects"]')) { this.view = 'projects'; return this.page(container); }
+      if (e.target.closest('[data-act="view-matrix"]')) { this.view = 'matrix'; return this.page(container); }
       if (e.target.closest('[data-act="clear-filters"]')) {
         this.filter = { status: '', category: '', priority: '', goal: '', date: '', search: '' };
         return this.page(container);
@@ -90,7 +92,58 @@ const Tasks = {
 
   renderCurrentView() {
     if (this.view === 'projects') return this.renderProjects();
+    if (this.view === 'matrix') return this.renderMatrix();
     this.renderList();
+  },
+
+  /** 📊 Eisenhower matrix — pending tasks split on urgent (due ≤ tomorrow,
+      incl. overdue) × important (high priority). Pure classification +
+      2×2 grid; tapping a task opens its edit form. */
+  matrixQuadrants() {
+    const today = Utils.today();
+    const tomorrow = Utils.addDays(today, 1);
+    const items = this.filtered().filter(t => t.status !== 'completed');
+    const isUrgent = t => !!t.scheduled_date && t.scheduled_date <= tomorrow;
+    const isImp = t => (t.priority || 'medium') === 'high';
+    const q = { q1: [], q2: [], q3: [], q4: [] };
+    items.forEach(t => {
+      const u = isUrgent(t), i = isImp(t);
+      if (u && i) q.q1.push(t);
+      else if (i) q.q2.push(t);
+      else if (u) q.q3.push(t);
+      else q.q4.push(t);
+    });
+    return q;
+  },
+
+  renderMatrix() {
+    const list = qs('#task-list', App.container());
+    if (!list) return;
+    const q = this.matrixQuadrants();
+    const box = (title, sub, arr, color, ic) => `
+      <div class="matrix-box" style="--mq:${color}">
+        <div class="matrix-head"><b>${ic} ${title}</b><span class="matrix-count">${arr.length}</span></div>
+        <div class="muted small" style="margin:2px 0 6px">${sub}</div>
+        ${arr.length ? arr.map(t => `
+          <button type="button" class="matrix-item" data-matrix-task="${t.id}" title="Open task">
+            <span class="mi-title">${Utils.esc(t.title)}</span>
+            <span class="muted small">${t.scheduled_date ? Utils.fmtDate(t.scheduled_date) : 'no date'}</span>
+          </button>`).join('') : '<p class="muted small" style="margin:4px 0 0">— empty —</p>'}
+      </div>`;
+    list.innerHTML = `
+      <div class="matrix-grid">
+        ${box('DO NOW', 'urgent + important', q.q1, '#ef4444', icon('fire'))}
+        ${box('SCHEDULE', 'important, not urgent', q.q2, '#6366f1', icon('calendar-days'))}
+        ${box('QUICK WINS', 'urgent, less important', q.q3, '#f5c518', icon('bolt'))}
+        ${box('LATER / DROP', 'neither urgent nor important', q.q4, '#64748b', icon('hourglass'))}
+      </div>
+      <p class="muted small" style="margin-top:10px">Urgent = due today, tomorrow or overdue · Important = high priority. Tap a task to edit it.</p>`;
+    list.onclick = e => {
+      const b = e.target.closest('[data-matrix-task]');
+      if (!b) return;
+      const t = (App.state.tasks || []).find(x => x.id === b.dataset.matrixTask);
+      if (t) this.openForm(t);
+    };
   },
 
   /** Project view: group the filtered tasks by their project tag. */
@@ -198,6 +251,7 @@ const Tasks = {
         <div class="task-main">
           <div class="task-title">${Utils.esc(t.title)} ${isPriority ? chip('top priority', 'var(--c-primary)') : ''}</div>
           <div class="task-meta">
+            ${(!done && Utils.num(t.estimated_minutes) > 0 && Utils.num(t.estimated_minutes) <= 5) ? chip('⚡ quick win', '#10b981') : ''}
             ${t.category ? chip(t.category, Utils.categoryColor(t.category)) : ''}
             ${chip(t.priority || 'medium', Utils.priorityColor(t.priority))}
             ${t.status !== 'pending' ? chip(t.status, t.status === 'completed' ? '#10b981' : '#f59e0b') : ''}

@@ -86,6 +86,50 @@ const Analytics = {
     };
   },
 
+  /** 🔋 Energy-aware insights — correlates daily-review energy ratings
+      (1–5) with weekdays and focus minutes. Needs ≥3 reviews to speak. */
+  energyInsights() {
+    const out = [];
+    const reviews = (App.state.dailyReviews || []).filter(r => Utils.num(r.energy) > 0);
+    if (reviews.length < 3) return out;
+
+    // average energy per weekday (≥2 samples each)
+    const byWd = {};
+    reviews.forEach(r => {
+      const wd = Utils.weekdayShort(String(r.date || '').slice(0, 10));
+      if (!wd) return;
+      (byWd[wd] = byWd[wd] || []).push(Utils.num(r.energy));
+    });
+    const avgs = Object.keys(byWd)
+      .filter(w => byWd[w].length >= 2)
+      .map(w => ({ wd: w, avg: byWd[w].reduce((a, b) => a + b, 0) / byWd[w].length, n: byWd[w].length }));
+    if (avgs.length >= 2) {
+      avgs.sort((a, b) => b.avg - a.avg);
+      const top = avgs[0], low = avgs[avgs.length - 1];
+      if (top.avg - low.avg >= 0.5) {
+        out.push({ icon: 'battery-full', tone: 'info', text: `Your energy peaks on ${top.wd}s (avg ${top.avg.toFixed(1)}/5) and dips on ${low.wd}s — put your hardest work on ${top.wd}.` });
+      }
+    }
+
+    // focus minutes on high-energy (≥4) vs low-energy (≤2) days
+    const energyByDate = {};
+    reviews.forEach(r => { energyByDate[String(r.date || '').slice(0, 10)] = Utils.num(r.energy); });
+    const hi = [], lo = [];
+    (App.state.focusSessions || []).forEach(s => {
+      const d = String(s.start_time || '').slice(0, 10);
+      const e = energyByDate[d];
+      if (!e) return;
+      if (e >= 4) hi.push(Utils.num(s.duration_minutes));
+      else if (e <= 2) lo.push(Utils.num(s.duration_minutes));
+    });
+    const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0;
+    if (hi.length >= 2 && lo.length >= 2) {
+      const d = avg(hi) - avg(lo);
+      if (d >= 10) out.push({ icon: 'bolt', tone: 'good', text: `On high-energy days you log ~${d} more focus minutes per session than low-energy days — protect your energy, protect your output.` });
+    }
+    return out;
+  },
+
   /** Per-day stats for the last `days` days ending today. Oldest first. */
   dailyStats(days) {
     const out = [];
@@ -361,6 +405,9 @@ const Analytics = {
         out.push({ icon: 'circle-check', tone: 'good', text: `Your planning is accurate (about ${plan.accuracy}% this month).` });
       }
     }
+
+    // 🔋 energy-aware insights (from daily review energy ratings)
+    out.push(...this.energyInsights());
 
     if (!out.length) out.push({ icon: 'circle-info', tone: 'muted', text: 'Not enough data yet — keep tracking for a few more days.' });
     return out.slice(0, 6);

@@ -1000,3 +1000,70 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 .routine-row .chip { flex: none; }
 
 .goal-pace { margin-top: 6px; line-height: 1.5; }
+
+/* ---- v2.5.0: Science pack (frog / matrix / habit stacking / quick win) ---- */
+.frog-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(245, 197, 24, 0.10);
+  border: 1px solid rgba(245, 197, 24, 0.40);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.frog-banner.frog-done {
+  background: rgba(16, 185, 129, 0.10);
+  border-color: rgba(16, 185, 129, 0.40);
+}
+.frog-emoji { font-size: 24px; line-height: 1.2; }
+.frog-banner .muted.small { margin-top: 2px; }
+
+.matrix-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 700px) { .matrix-grid { grid-template-columns: 1fr; } }
+.matrix-box {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--mq, var(--border));
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 120px;
+}
+.matrix-head { display: flex; align-items: center; gap: 8px; }
+.matrix-count {
+  margin-left: auto;
+  font-weight: 800;
+  font-size: 12px;
+  min-width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--mq, var(--border));
+  color: #fff;
+}
+.matrix-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  margin-top: 5px;
+  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--text, inherit);
+  font-size: 13px;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+.matrix-item:hover { background: var(--bg-hover, rgba(154, 158, 166, 0.12)); }
+.matrix-item .mi-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.routine-row.habit-stack { padding-left: 26px; }
+.routine-row.habit-stack .routine-name { color: var(--c-primary); }
