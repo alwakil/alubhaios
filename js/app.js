@@ -159,6 +159,42 @@ const App = {
     this.setLoading(false);
     this.updateConnUI();
     this.route();
+    this.checkLevelUp();
+  },
+
+  /** 🎉 level-up celebration — fires once per new level (pref-tracked). */
+  checkLevelUp() {
+    try {
+      if (typeof Gamify === 'undefined' || !App.online) return;
+      const lv = Gamify.level(Gamify.xp()).level;
+      const last = Utils.pref('lastLevel') || 0; // single-arg READ — two-arg would write 0 (pref bug pattern)
+      if (lv > last && last > 0) this.celebrate(lv);
+      if (lv !== last) Utils.pref('lastLevel', lv);
+    } catch (e) { /* never block boot */ }
+  },
+
+  celebrate(lv) {
+    const ov = document.createElement('div');
+    ov.className = 'levelup-overlay';
+    const colors = ['#f5c518', '#10b981', '#6366f1', '#ef4444', '#a78bfa', '#f97316'];
+    const confetti = Array.from({ length: 44 }, (_, i) =>
+      `<span class="confetti" style="left:${(Math.random() * 100).toFixed(1)}%;background:${colors[i % colors.length]};animation-delay:${(Math.random() * 0.9).toFixed(2)}s;animation-duration:${(2 + Math.random() * 1.6).toFixed(2)}s"></span>`).join('');
+    // Arena's AluBhai joins the party in his victory pose (arms-up bounce)
+    const alu = (typeof Arena !== 'undefined' && Arena.aluSvg)
+      ? `<div class="levelup-alu f-win">${Arena.aluSvg()}</div>` : '';
+    ov.innerHTML = `
+      <div class="confetti-wrap">${confetti}</div>
+      <div class="levelup-card">
+        ${alu}
+        <div class="levelup-big">🎉</div>
+        <h2>LEVEL ${lv} UNLOCKED!</h2>
+        <p class="muted">AluBhai is proud of you — keep climbing.</p>
+        <button class="btn btn-primary" id="levelup-close">${icon('rocket')} Keep going</button>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.addEventListener('click', close);
+    setTimeout(close, 7000);
   },
 
   container() { return qs('#page-' + this.current); },
@@ -184,6 +220,7 @@ const App = {
 
   refreshCurrent() {
     Charts.destroyAll();
+    this.checkLevelUp();
     const section = this.container();
     if (!section) return;
     try { PAGES[this.current].render(section); }

@@ -1100,3 +1100,59 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 
 .morning-brief { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; padding: 12px 14px; }
 .morning-brief .insight-card { margin: 0; }
+
+/* ---- v2.7.0: checklists / distraction log / shutdown / level-up ---- */
+.task-checklist { margin-top: 8px; }
+.chk-progress { margin-bottom: 4px; font-weight: 700; }
+.chk-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; padding: 3px 0; cursor: pointer;
+}
+.chk-row input { width: auto; cursor: pointer; }
+.chk-row.checked span { text-decoration: line-through; opacity: 0.55; }
+
+.distraction-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.distraction-quick .btn { border-radius: 999px; }
+
+.today-summary .form-actions, .today-summary a.btn { margin-right: 0; }
+.today-summary { text-align: left; }
+
+.levelup-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15, 17, 20, 0.88);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.levelup-card {
+  position: relative; z-index: 2;
+  background: var(--bg-card, #2b2e34);
+  border: 1px solid var(--c-primary);
+  border-radius: 18px;
+  padding: 34px 46px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: levelup-pop 0.5s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+.levelup-card h2 { font-size: 30px; margin: 10px 0 6px; color: var(--c-primary); }
+.levelup-big { font-size: 54px; }
+.levelup-alu { width: 92px; margin: 0 auto 4px; }
+.levelup-alu .fighter-svg { transform: none; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
+@keyframes levelup-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.confetti-wrap { position: absolute; inset: 0; pointer-events: none; }
+.confetti {
+  position: absolute; top: -14px;
+  width: 10px; height: 16px;
+  border-radius: 2px;
+  animation: confetti-fall linear infinite;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(720deg); opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti { animation: none !important; opacity: 0; }
+  .levelup-card { animation: none; }
+}

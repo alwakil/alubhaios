@@ -130,6 +130,19 @@ const Analytics = {
     return out;
   },
 
+  /** 📝 distraction log — top trigger this week (needs ≥3 entries). */
+  distractionLogInsight() {
+    let arr = [];
+    try { arr = JSON.parse(App.settings.distraction_log || '[]'); } catch (e) { return []; }
+    const weekAgo = Utils.addDays(Utils.today(), -6);
+    const week = arr.filter(e => String(e.ts || '').slice(0, 10) >= weekAgo);
+    if (week.length < 3) return [];
+    const counts = {};
+    week.forEach(e => { counts[e.trigger] = (counts[e.trigger] || 0) + 1; });
+    const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    return [{ icon: 'phone-flip', tone: 'warn', text: `Top distraction this week: ${top} (${counts[top]}×) — knowing the trigger is half the fix.` }];
+  },
+
   /** Per-day stats for the last `days` days ending today. Oldest first. */
   dailyStats(days) {
     const out = [];
@@ -408,6 +421,9 @@ const Analytics = {
 
     // 🔋 energy-aware insights (from daily review energy ratings)
     out.push(...this.energyInsights());
+
+    // 📝 distraction log — top trigger this week (needs ≥3 entries)
+    out.push(...this.distractionLogInsight());
 
     if (!out.length) out.push({ icon: 'circle-info', tone: 'muted', text: 'Not enough data yet — keep tracking for a few more days.' });
     return out.slice(0, 6);

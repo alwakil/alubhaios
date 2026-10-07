@@ -25,6 +25,7 @@ const Tasks = {
             <button class="${this.view === 'matrix' ? 'on' : ''}" data-act="view-matrix" title="Eisenhower matrix — urgent × important">${icon('table-cells-large')} Matrix</button>
             <button class="${this.view === 'calendar' ? 'on' : ''}" data-act="view-calendar" title="Month calendar">${icon('calendar-days')} Calendar</button>
           </div>
+          <button class="btn btn-sm" data-act="templates" title="Reusable task bundles">${icon('layer-group')} Templates</button>
           <button class="btn btn-primary" data-act="new">${icon('plus')} New task</button>
         </div>
       </div>
@@ -72,10 +73,13 @@ const Tasks = {
       if (e.target.closest('[data-act="view-projects"]')) { this.view = 'projects'; return this.page(container); }
       if (e.target.closest('[data-act="view-matrix"]')) { this.view = 'matrix'; return this.page(container); }
       if (e.target.closest('[data-act="view-calendar"]')) { this.view = 'calendar'; return this.page(container); }
+      if (e.target.closest('[data-act="templates"]')) return this.openTemplates();
       if (e.target.closest('[data-act="clear-filters"]')) {
         this.filter = { status: '', category: '', priority: '', goal: '', date: '', search: '' };
         return this.page(container);
       }
+      const chk = e.target.closest('[data-task-checklist]');
+      if (chk) return this.toggleChecklist(chk.dataset.taskChecklist, Number(chk.dataset.idx));
       const btn = e.target.closest('[data-task-action]');
       if (btn) this.handleCardAction(btn.dataset.taskAction, btn.closest('[data-id]').dataset.id);
     };
@@ -92,6 +96,124 @@ const Tasks = {
     f.priority = qs('#tf-priority', c) ? qs('#tf-priority', c).value : f.priority;
     f.goal = qs('#tf-goal', c) ? qs('#tf-goal', c).value : f.goal;
     f.date = qs('#tf-date', c) ? qs('#tf-date', c).value : f.date;
+  },
+
+  /** ✅ checklist inside a task — stored as [ ] / [x] lines in the
+      description (zero schema change). Pure helpers + toggle. */
+  parseChecklist(desc) {
+    const plain = [], items = [];
+    String(desc || '').split('\n').forEach(line => {
+      const m = line.match(/^\s*\[( |x|X)\]\s*(.*)$/);
+      if (m) items.push({ done: m[1].toLowerCase() === 'x', text: m[2] });
+      else if (line.trim()) plain.push(line.trim());
+    });
+    return { plain, items };
+  },
+  toggleChecklistLine(desc, idx) {
+    let n = -1;
+    return String(desc || '').split('\n').map(line => {
+      const m = line.match(/^(\s*)\[( |x|X)\](\s*)(.*)$/);
+      if (!m) return line;
+      n++;
+      if (n !== idx) return line;
+      return `${m[1]}[${m[2].toLowerCase() === 'x' ? ' ' : 'x'}]${m[4]}`;
+    }).join('\n');
+  },
+  async toggleChecklist(taskId, idx) {
+    const t = (App.state.tasks || []).find(x => x.id === taskId);
+    if (!t) return;
+    try {
+      const rec = await API.updateTask(taskId, { description: this.toggleChecklistLine(t.description, idx) });
+      App.replaceRecord('tasks', rec);
+      App.refreshCurrent();
+    } catch (e) { App.handleError(e); }
+  },
+  checklistHtml(t) {
+    const { items } = this.parseChecklist(t.description);
+    if (!items.length) return '';
+    const doneN = items.filter(i => i.done).length;
+    const rows = items.map((it, i) => `
+      <label class="chk-row${it.done ? ' checked' : ''}">
+        <input type="checkbox" data-task-checklist="${t.id}" data-idx="${i}" ${it.done ? 'checked' : ''}>
+        <span>${Utils.esc(it.text)}</span>
+      </label>`).join('');
+    return `<div class="task-checklist"><div class="chk-progress muted small">☑ ${doneN}/${items.length} steps</div>${rows}</div>`;
+  },
+
+  /** 🗂 task templates — reusable bundles, stored in Settings JSON. */
+  templates() {
+    try { return JSON.parse(App.settings.task_templates || '[]'); } catch (e) { return []; }
+  },
+  parseTemplateLines(text) {
+    return String(text || '').split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+      const parts = line.split('|').map(p => p.trim());
+      return {
+        title: parts[0],
+        priority: ['high', 'medium', 'low'].includes(parts[1]) ? parts[1] : 'medium',
+        estimated_minutes: Utils.num(parts[2]) || ''
+      };
+    });
+  },
+  async saveTemplates(tpl) {
+    App.settings.task_templates = JSON.stringify(tpl);
+    await API.saveSettings({ task_templates: App.settings.task_templates });
+  },
+  openTemplates() {
+    const tpl = this.templates();
+    const m = openModal({
+      title: icon('layer-group') + ' Task templates',
+      body: `
+        <div class="stack" id="tpl-list">
+          ${tpl.length ? tpl.map(t => `
+          <div class="card" style="padding:10px">
+            <div class="task-meta"><b>${Utils.esc(t.name)}</b><span class="muted small">${t.items.length} tasks</span></div>
+            <div class="muted small">${t.items.map(i => Utils.esc(i.title)).join(' · ')}</div>
+            <div class="form-actions" style="margin:8px 0 0">
+              <button class="btn btn-sm btn-primary" data-tpl-apply="${t.id}">${icon('rocket')} Create ${t.items.length} tasks today</button>
+              <button class="btn btn-sm btn-ghost danger" data-tpl-del="${t.id}">${icon('trash')} Delete</button>
+            </div>
+          </div>`).join('') : '<p class="muted small">No templates yet — create one below (one task per line).</p>'}
+        </div>
+        <div class="section-subhead" style="margin-top:14px">New template</div>
+        <form id="tpl-form">
+          <label class="field"><span>Template name *</span>
+            <input name="name" required maxlength="60" placeholder="e.g. CTF solve"></label>
+          <label class="field"><span>Tasks — one per line (title | priority | minutes)</span>
+            <textarea name="lines" rows="4" required placeholder="Enumerate machine | high | 45&#10;Write report | medium | 30"></textarea></label>
+          <button class="btn btn-primary btn-sm" type="button" id="tpl-create">${icon('plus')} Save template</button>
+        </form>`
+    });
+    m.overlay.onclick = e => {
+      const apply = e.target.closest('[data-tpl-apply]');
+      const del = e.target.closest('[data-tpl-del]');
+      const create = e.target.closest('#tpl-create');
+      if (apply) {
+        const t = this.templates().find(x => x.id === apply.dataset.tplApply);
+        if (!t) return;
+        (async () => {
+          for (const item of t.items) {
+            try { const rec = await API.createTask({ title: item.title, priority: item.priority, estimated_minutes: item.estimated_minutes, scheduled_date: Utils.today(), status: 'pending' }); App.replaceRecord('tasks', rec); }
+            catch (e) { App.handleError(e); return; }
+          }
+          m.close(); App.refreshCurrent();
+          toast(`🚀 ${t.items.length} tasks created from "${t.name}"`, 'success');
+        })();
+      }
+      if (del) {
+        this.saveTemplates(this.templates().filter(x => x.id !== del.dataset.tplDel))
+          .then(() => { m.close(); this.openTemplates(); });
+      }
+      if (create) {
+        const form = qs('#tpl-form', m.overlay);
+        if (!form.reportValidity()) return;
+        const fd = new FormData(form);
+        const items = this.parseTemplateLines(fd.get('lines'));
+        if (!items.length) return toast('Add at least one task line.', 'warn');
+        this.saveTemplates(this.templates().concat([{ id: Utils.uid(), name: fd.get('name').trim(), items }]))
+          .then(() => { m.close(); this.openTemplates(); toast('Template saved', 'success'); })
+          .catch(e => App.handleError(e));
+      }
+    };
   },
 
   renderCurrentView() {
@@ -373,6 +495,7 @@ const Tasks = {
             })()}
             ${goal ? chip('🎯 ' + goal.title, 'var(--c-primary)') : ''}
           </div>
+          ${this.checklistHtml(t)}
         </div>
         <div class="task-actions">
           <button class="btn btn-icon btn-ghost" data-task-action="focus" title="Start focus session">${icon('play')}</button>

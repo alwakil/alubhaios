@@ -279,6 +279,7 @@ const Dashboard = {
           <div><b>${stats.score}</b><span>productivity</span></div>
         </div>
         <a class="btn btn-primary" href="#/reviews">${icon('pen-to-square')} Write daily review</a>
+        <button class="btn" id="today-shutdown">${icon('moon')} Plan tomorrow</button>
       </div>
     `;
 
@@ -455,7 +456,42 @@ const Dashboard = {
     }
     const habitBtn = e.target.closest('[data-habit]');
     if (habitBtn) { Habits.toggleToday(habitBtn.dataset.habit); return; }
+    const chk = e.target.closest('[data-task-checklist]');
+    if (chk) { Tasks.toggleChecklist(chk.dataset.taskChecklist, Number(chk.dataset.idx)); return; }
+    if (e.target.closest('#today-shutdown')) { this.openShutdown(); return; }
     const card = e.target.closest('[data-task-action]');
     if (card) Tasks.handleCardAction(card.dataset.taskAction, card.closest('[data-id]').dataset.id);
+  },
+
+  /** 🌙 shutdown ritual — pick what carries over to tomorrow; a deliberate
+      close of the day (closure + fresh-start science). */
+  openShutdown() {
+    const today = Utils.today(), tomorrow = Utils.addDays(today, 1);
+    const open = (App.state.tasks || []).filter(t => !t._archived && t.status !== 'completed' &&
+      t.scheduled_date && t.scheduled_date <= today);
+    const tmrCount = (App.state.tasks || []).filter(t => !t._archived && t.scheduled_date === tomorrow && t.status !== 'completed').length;
+    const m = openModal({
+      title: icon('moon') + ' Shutdown ritual — plan tomorrow',
+      body: `
+        <p class="muted small">Pick what carries over to <b>${Utils.fmtDay(tomorrow)}</b>. Closing today deliberately = a fresh start tomorrow.</p>
+        <div class="stack">
+        ${open.length ? open.map(t => `
+          <label class="check-inline"><input type="checkbox" value="${t.id}" class="sd-pick" checked>
+            <span>${Utils.esc(t.title)}</span> ${chip('due ' + Utils.fmtDate(t.scheduled_date), t.scheduled_date < today ? '#ef4444' : '#64748b')}
+          </label>`).join('') : '<p class="muted small">Nothing pending today — tomorrow starts clean. 🌙</p>'}
+        </div>
+        <p class="muted small">Tomorrow already has ${tmrCount} pending task${tmrCount === 1 ? '' : 's'}.</p>`,
+      footer: `<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" id="sd-confirm">${icon('moon')} ${open.length ? 'Move selected to tomorrow' : 'Close the day'}</button>`
+    });
+    qs('[data-cancel]', m.overlay).addEventListener('click', m.close);
+    qs('#sd-confirm', m.overlay).addEventListener('click', async () => {
+      const ids = qsa('.sd-pick', m.overlay).filter(c => c.checked).map(c => c.value);
+      for (const id of ids) {
+        try { const rec = await API.updateTask(id, { scheduled_date: tomorrow }); App.replaceRecord('tasks', rec); }
+        catch (e) { App.handleError(e); m.close(); return; }
+      }
+      m.close(); App.refreshCurrent();
+      toast(ids.length ? `🌙 ${ids.length} task${ids.length > 1 ? 's' : ''} planned for tomorrow — day closed.` : '🌙 Day closed. See you tomorrow!', 'success');
+    });
   }
 };

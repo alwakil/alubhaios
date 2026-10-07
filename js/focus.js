@@ -368,6 +368,47 @@ const Focus = {
       .catch(e => App.handleError(e));
   },
 
+  /* ================= distraction log ================= */
+
+  DISTRACTION_PRESETS: ['Phone', 'Social media', 'YouTube', 'Games', 'Snack', 'Other'],
+
+  distractionLog() {
+    try { return JSON.parse(App.settings.distraction_log || '[]'); } catch (e) { return []; }
+  },
+
+  async logDistraction(trigger) {
+    const arr = this.distractionLog();
+    arr.push({ ts: Utils.nowISO(), trigger });
+    App.settings.distraction_log = JSON.stringify(arr);
+    try {
+      await API.saveSettings({ distraction_log: App.settings.distraction_log });
+      toast('📝 Logged: ' + trigger, 'info');
+      this.renderDistractionLog(qs('#distraction-log', App.container()));
+    } catch (e) { App.handleError(e); }
+  },
+
+  async clearTodaysDistractions() {
+    const today = Utils.today();
+    const keep = this.distractionLog().filter(e => String(e.ts).slice(0, 10) !== today);
+    App.settings.distraction_log = JSON.stringify(keep);
+    try {
+      await API.saveSettings({ distraction_log: App.settings.distraction_log });
+      this.renderDistractionLog(qs('#distraction-log', App.container()));
+    } catch (e) { App.handleError(e); }
+  },
+
+  renderDistractionLog(wrap) {
+    if (!wrap) return;
+    const today = Utils.today();
+    const todays = this.distractionLog().filter(e => String(e.ts).slice(0, 10) === today);
+    wrap.innerHTML = `
+      <p class="muted small" style="margin:0 0 8px">Mind wandered during focus? One tap — find your triggers later.</p>
+      <div class="distraction-quick">${this.DISTRACTION_PRESETS.map(p =>
+        `<button class="btn btn-sm" data-log-distraction="${p}">${p}</button>`).join('')}</div>
+      ${todays.length ? `<div class="muted small" style="margin-top:8px"><b>Today:</b> ${todays.map(e => Utils.esc(e.trigger)).join(' · ')} (${todays.length})</div>
+      <button class="btn btn-ghost btn-sm" data-clear-distraction="1" style="margin-top:6px">Clear today's entries</button>` : ''}`;
+  },
+
   /* ================= ticker ================= */
 
   tick() {
@@ -457,18 +498,26 @@ const Focus = {
       <div class="section-head"><h3>${icon('shield-halved')} Focus Arena</h3></div>
       <div id="focus-arena" class="card"></div>
 
+      <div class="section-head"><h3>📝 Distraction log</h3></div>
+      <div class="card" id="distraction-log"></div>
+
       <div class="section-head"><h3>Today's sessions</h3></div>
       <div id="focus-sessions" class="stack"></div>
     `;
 
     this.renderPanel();
     if (window.Arena) Arena.render(qs('#focus-arena', container));
+    this.renderDistractionLog(qs('#distraction-log', container));
 
     container.onclick = e => {
       const fmode = e.target.closest('[data-fmode]');
       if (fmode) { this.setView(fmode.dataset.fmode); return this.page(container); }
       const pbtn = e.target.closest('[data-pomo]');
       if (pbtn) return this.pomoAction(pbtn.dataset.pomo, container);
+      const logBtn = e.target.closest('[data-log-distraction]');
+      if (logBtn) return this.logDistraction(logBtn.dataset.logDistraction);
+      const clrBtn = e.target.closest('[data-clear-distraction]');
+      if (clrBtn) return this.clearTodaysDistractions();
       const btn = e.target.closest('[data-focus]');
       if (btn) {
         const act = btn.dataset.focus;
