@@ -226,6 +226,38 @@ const Analytics = {
       .sort((a, b) => b.minutes - a.minutes);
   },
 
+  /** 🎯 Which goal a focus session counts toward. Priority: explicit
+      goal_id column > [goal:<id>] tag in notes > the linked task's goal.
+      Returns '' when the session is unassigned. */
+  sessionGoalId(s) {
+    if (s.goal_id) return s.goal_id;
+    const m = String(s.notes || '').match(/\[goal:([^\]]+)\]/);
+    if (m) return m[1];
+    const t = (App.state.tasks || []).find(x => x.id === s.task_id);
+    return (t && t.goal_id) || '';
+  },
+
+  /** ⏱ Focus minutes per goal over the last `days` days. Distraction
+      categories never count as goal progress. Returns
+      { rows: [{goalId, minutes}] sorted desc, unassigned }. */
+  goalFocusBreakdown(days) {
+    const from = Utils.addDays(Utils.today(), -(days - 1));
+    const byGoal = {};
+    let unassigned = 0;
+    (App.state.focusSessions || []).forEach(s => {
+      if (this.sessionDate(s) < from) return;
+      if (this.isDistractionSession(s)) return;
+      const gid = this.sessionGoalId(s);
+      if (gid) byGoal[gid] = (byGoal[gid] || 0) + Utils.num(s.duration_minutes);
+      else unassigned += Utils.num(s.duration_minutes);
+    });
+    return {
+      rows: Object.keys(byGoal).map(id => ({ goalId: id, minutes: byGoal[id] }))
+        .sort((a, b) => b.minutes - a.minutes),
+      unassigned: unassigned
+    };
+  },
+
   /** Best weekday for task completion (needs >=2 samples per weekday). */
   bestWeekday(days) {
     const daily = this.dailyStats(days);

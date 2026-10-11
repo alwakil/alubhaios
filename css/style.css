@@ -1156,3 +1156,17 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
   .confetti { animation: none !important; opacity: 0; }
   .levelup-card { animation: none; }
 }
+
+/* ============ v2.8.0 — goal-tagged focus time ============ */
+
+/* goal tag shown under a running timer ring */
+.focus-goal-tag {
+  margin: 10px 0 0;
+  color: var(--c-primary);
+  font-weight: 600;
+  font-size: 14px;
+}
+.focus-goal-tag i { margin-right: 4px; }
+
+/* per-goal focus total on the goal card */
+.goal-focus-min { color: var(--c-primary); }

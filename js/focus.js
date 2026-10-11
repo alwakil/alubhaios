@@ -10,9 +10,10 @@
 
 const Focus = {
   presetTask: null,   // set by Tasks when clicking "play" on a task
+  presetGoal: null,   // set by Goals when clicking "focus" on a goal
   view: 'stopwatch',  // 'stopwatch' | 'pomodoro'
-  timer: null,        // stopwatch: {running, startedAt, accumulatedMs, firstStart, mode, category, taskId}
-  pomo: null,         // pomodoro: {phase, running, endsAt, remainingMs, focusMin, breakMin, taskId, category}
+  timer: null,        // stopwatch: {running, startedAt, accumulatedMs, firstStart, mode, category, taskId, goalId}
+  pomo: null,         // pomodoro: {phase, running, endsAt, remainingMs, focusMin, breakMin, taskId, category, goalId}
   _interval: null,
 
   init() {
@@ -108,11 +109,12 @@ const Focus = {
     return Math.floor(ms / 1000);
   },
 
-  start(mode, category, taskId) {
+  start(mode, category, taskId, goalId) {
     const now = Date.now();
     this.timer = {
       running: true, startedAt: now, accumulatedMs: 0, firstStart: now,
-      mode: mode || 'Deep Work', category: category || 'Learning', taskId: taskId || ''
+      mode: mode || 'Deep Work', category: category || 'Learning', taskId: taskId || '',
+      goalId: goalId || ''
     };
     this.save();
     toast('Focus session started — good luck!', 'success');
@@ -158,6 +160,7 @@ const Focus = {
       duration_minutes: minutes,
       focus_rating: '',
       interruptions: 0,
+      goal_id: '', // pauses are never goal progress
       notes: '[auto] paused during a focus session'
     })
       .then(rec => {
@@ -247,13 +250,14 @@ const Focus = {
 
   /* ================= pomodoro ================= */
 
-  startPomo(focusMin, breakMin, taskId, category) {
+  startPomo(focusMin, breakMin, taskId, category, goalId) {
     const now = Date.now();
     this.pomo = {
       phase: 'focus', running: true,
       endsAt: now + focusMin * 60000, remainingMs: 0,
       focusMin: Utils.clamp(focusMin, 1, 180), breakMin: Utils.clamp(breakMin, 1, 60),
-      taskId: taskId || '', category: category || 'Learning'
+      taskId: taskId || '', category: category || 'Learning',
+      goalId: goalId || ''
     };
     this.setView('pomodoro'); // starting a pomodoro must show the pomodoro panel
     this.savePomo();
@@ -338,6 +342,7 @@ const Focus = {
       duration_minutes: minutes,
       focus_rating: '',
       interruptions: 0,
+      goal_id: t ? t.goalId : '',
       notes: '[pomodoro]'
     };
     API.createFocusSession(data)
@@ -361,6 +366,7 @@ const Focus = {
       duration_minutes: minutes,
       focus_rating: '',
       interruptions: 0,
+      goal_id: t ? t.goalId : '',
       notes: '[pomodoro]' + (noteSuffix ? ' ' + noteSuffix : '')
     };
     API.createFocusSession(data)
@@ -484,6 +490,7 @@ const Focus = {
     const openTasks = tasks.filter(t => !t._archived && t.status !== 'completed');
     const taskOptions = '<option value="">— no specific task —</option>' + openTasks.map(t =>
       `<option value="${t.id}" ${today === t.scheduled_date ? 'data-today="1"' : ''}>${Utils.esc(t.title)}</option>`).join('');
+    const goalOptions = this.goalOptionsHtml();
 
     container.innerHTML = `
       <div class="page-head"><h2>Focus</h2></div>
@@ -521,7 +528,7 @@ const Focus = {
       const btn = e.target.closest('[data-focus]');
       if (btn) {
         const act = btn.dataset.focus;
-        if (act === 'start') this.start(qs('#focus-mode', container).value, qs('#focus-category', container).value, qs('#focus-task', container).value);
+        if (act === 'start') this.start(qs('#focus-mode', container).value, qs('#focus-category', container).value, qs('#focus-task', container).value, qs('#focus-goal', container).value);
         if (act === 'pause') this.pause();
         if (act === 'resume') this.resume();
         if (act === 'stop') this.stop();
@@ -532,6 +539,16 @@ const Focus = {
     };
 
     this.renderSessions();
+  },
+
+  /** Goal dropdown markup — active goals first, then paused/completed. */
+  goalOptionsHtml(selectedId) {
+    const goals = App.state.goals || [];
+    if (!goals.length) return '<option value="">— no goals yet —</option>';
+    const rank = g => g.status === 'active' ? 0 : 1;
+    const sorted = goals.slice().sort((a, b) => rank(a) - rank(b) || String(a.title).localeCompare(String(b.title)));
+    return '<option value="">🎯 no specific goal</option>' + sorted.map(g =>
+      `<option value="${g.id}" ${selectedId === g.id ? 'selected' : ''}>${g.status === 'active' ? '' : '[' + (g.status || 'active') + '] '}${Utils.esc(g.title)}</option>`).join('');
   },
 
   renderPanel() {
@@ -546,6 +563,7 @@ const Focus = {
     const categoryOptions = Options.get('taskCategories').map(c => `<option>${Utils.esc(c)}</option>`).join('');
     const modeOptions = (CONFIG.FOCUS_MODES || []).map(m =>
       `<option value="${Utils.esc(m.name)}">${Utils.esc(m.name)} · ~${m.suggested_minutes} min</option>`).join('');
+    const goalOptions = this.goalOptionsHtml();
 
     if (this.view === 'pomodoro') {
       const t = this.pomo;
@@ -556,6 +574,7 @@ const Focus = {
         const remain = Math.ceil(this.pomoRemainingMs() / 1000);
         const total = this.pomoPhaseTotalMs();
         const pctDone = (1 - this.pomoRemainingMs() / total) * 100;
+        const goal = (App.state.goals || []).find(g => g.id === t.goalId);
         panel.innerHTML = `
           <div class="pomo-phase ${t.phase}">
             ${t.phase === 'focus' ? icon('clock-rotate-left') + ' FOCUS' : icon('mug-hot') + ' BREAK'}
@@ -566,6 +585,7 @@ const Focus = {
               <div class="muted small">${t.focusMin}m focus · ${t.breakMin}m break</div>
             </div></div>
           </div>
+          ${goal ? `<p class="focus-goal-tag">${icon('bullseye')} ${Utils.esc(goal.title)}</p>` : ''}
           <p class="muted" id="pomo-hint">${t.running ? (t.phase === 'focus' ? 'Focus block running — stay with it. 🍅' : 'Break time — relax. ☕') : 'Paused.'}</p>
           ${!t.running && t.pausedAt ? this._pauseDuelHtml(`<div class="focus-ring" id="pomo-ring"><div class="focus-ring-inner"><div class="focus-time" id="pomo-time">${Utils.fmtClock(Math.ceil(this.pomoRemainingMs() / 1000))}</div><div class="muted small">⚡ ${t.focusMin}m focus · ${t.breakMin}m break</div></div></div>`) : ''}
           <div class="focus-controls">
@@ -590,6 +610,7 @@ const Focus = {
             </div>
             <label class="field"><span>Category</span><select id="pomo-category">${categoryOptions}</select></label>
             <label class="field"><span>Task</span><select id="pomo-task">${taskOptions}</select></label>
+            <label class="field"><span>Goal</span><select id="pomo-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
             <div class="focus-controls">
               <button class="btn btn-primary btn-lg" data-pomo="start">${icon('play')} Start pomodoro</button>
             </div>
@@ -598,20 +619,32 @@ const Focus = {
           </div>
         `;
         const sel = qs('#pomo-task', panel);
+        const presetTaskAtRender = this.presetTask;
         if (sel) {
-          if (this.presetTask) sel.value = this.presetTask;
+          if (presetTaskAtRender) sel.value = presetTaskAtRender;
           else {
             const firstToday = qsa('option[data-today]', sel)[0];
             if (firstToday) sel.value = firstToday.value;
           }
         }
+        // explicit goal click (🎯 button on Goals page) wins over task's goal
+        const gsel = qs('#pomo-goal', panel);
+        if (gsel) {
+          if (this.presetGoal) gsel.value = this.presetGoal;
+          else if (presetTaskAtRender) {
+            const pt = tasks.find(x => x.id === presetTaskAtRender);
+            if (pt && pt.goal_id) gsel.value = pt.goal_id;
+          }
+        }
         this.presetTask = null;
+        this.presetGoal = null;
       }
       return;
     }
 
     /* stopwatch panel */
     const active = this.isActive() && this.timer;
+    const runGoal = active ? (App.state.goals || []).find(g => g.id === this.timer.goalId) : null;
     panel.innerHTML = active ? `
       <div class="focus-ring-wrap">
         <div class="focus-ring" id="focus-ring"><div class="focus-ring-inner">
@@ -619,6 +652,7 @@ const Focus = {
           <div class="muted small">${Utils.esc(this.timer.mode)} · ${Utils.esc(this.timer.category)}</div>
         </div></div>
       </div>
+      ${runGoal ? `<p class="focus-goal-tag">${icon('bullseye')} ${Utils.esc(runGoal.title)}</p>` : ''}
       <p class="muted" id="focus-state-hint">${this.timer.running ? 'Session running — stay with it.' : 'Paused.'}</p>
       ${!this.timer.running && this.timer.pausedAt ? this._pauseDuelHtml(`<div class="focus-ring" id="focus-ring"><div class="focus-ring-inner"><div class="focus-time">${Utils.fmtClock(this.elapsedSec())}</div><div class="muted small">⚡ ${Utils.esc(this.timer.mode)} · ${Utils.esc(this.timer.category)}</div></div></div>`) : ''}
       <div class="focus-controls">
@@ -636,6 +670,7 @@ const Focus = {
           <label class="field"><span>Category</span><select id="focus-category">${categoryOptions}</select></label>
         </div>
         <label class="field"><span>Task</span><select id="focus-task">${taskOptions}</select></label>
+        <label class="field"><span>Goal</span><select id="focus-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
         <div class="focus-controls">
           <button class="btn btn-primary btn-lg" data-focus="start">${icon('play')} Start</button>
         </div>
@@ -644,14 +679,24 @@ const Focus = {
     `;
     if (!active) {
       const sel = qs('#focus-task', panel);
+      const presetTaskAtRender = this.presetTask;
       if (sel) {
-        if (this.presetTask) sel.value = this.presetTask;
+        if (presetTaskAtRender) sel.value = presetTaskAtRender;
         else {
           const firstToday = qsa('option[data-today]', sel)[0];
           if (firstToday) sel.value = firstToday.value;
         }
       }
+      const gsel = qs('#focus-goal', panel);
+      if (gsel) {
+        if (this.presetGoal) gsel.value = this.presetGoal;
+        else if (presetTaskAtRender) {
+          const pt = tasks.find(x => x.id === presetTaskAtRender);
+          if (pt && pt.goal_id) gsel.value = pt.goal_id;
+        }
+      }
       this.presetTask = null;
+      this.presetGoal = null;
     } else {
       const mode = (CONFIG.FOCUS_MODES || []).find(m => m.name === this.timer.mode);
       const suggested = (mode && mode.suggested_minutes) || 45;
@@ -669,7 +714,8 @@ const Focus = {
         Utils.num(qs('#pomo-focus-min', container).value) || 25,
         Utils.num(qs('#pomo-break-min', container).value) || 5,
         qs('#pomo-task', container).value,
-        qs('#pomo-category', container).value
+        qs('#pomo-category', container).value,
+        qs('#pomo-goal', container).value
       );
     }
     if (act === 'pause') this.pomoPause();
@@ -701,6 +747,7 @@ const Focus = {
       </div>
       ${sessions.map(s => {
         const task = (App.state.tasks || []).find(t => t.id === s.task_id);
+        const goal = (App.state.goals || []).find(g => g.id === (Analytics.sessionGoalId ? Analytics.sessionGoalId(s) : ''));
         const rating = Utils.num(s.focus_rating);
         const starBtns = [1, 2, 3, 4, 5].map(n =>
           `<button class="star-btn ${n <= rating ? 'on' : ''}" data-session-rate="${n}" title="Rate focus quality ${n}/5">${icon('star')}</button>`).join('');
@@ -712,6 +759,7 @@ const Focus = {
               ${chip(String(s.start_time).slice(11, 16) + ' – ' + String(s.end_time).slice(11, 16), '#64748b')}
               ${chip(Utils.fmtMinutes(s.duration_minutes), 'var(--c-primary)')}
               ${chip(s.category || 'Other', Utils.categoryColor(s.category))}
+              ${goal ? chip('🎯 ' + goal.title, 'var(--c-primary)') : ''}
               <span class="stars" title="Tap a star to rate how focused you were">${starBtns}</span>
               ${Utils.num(s.interruptions) ? chip(s.interruptions + ' interruptions', '#ef4444') : ''}
             </div>
@@ -775,6 +823,8 @@ const Focus = {
               <option value="">— no specific task —</option>
               ${tasks.map(x => `<option value="${x.id}" ${t.taskId === x.id ? 'selected' : ''}>${Utils.esc(x.title)}</option>`).join('')}
             </select></label>
+          <label class="field"><span>Goal</span>
+            <select name="goal_id">${this.goalOptionsHtml(t.goalId)}</select></label>
           <div class="field-row">
             <label class="field"><span>Category</span>
               <select name="category">${Options.get('taskCategories').map(c => `<option ${t.category === c ? 'selected' : ''}>${Utils.esc(c)}</option>`).join('')}</select></label>
@@ -812,6 +862,7 @@ const Focus = {
       const fd = new FormData(form);
       const data = {
         task_id: fd.get('task_id'),
+        goal_id: fd.get('goal_id'),
         category: fd.get('category'),
         start_time: this.epochISO(t.firstStart),
         end_time: Utils.nowISO(),

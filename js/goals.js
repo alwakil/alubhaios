@@ -47,6 +47,8 @@ const GoalPace = {
 };
 
 const Goals = {
+  range: 7, // focus-time chart window in days (7 | 30 | 90)
+
   page(container) {
     const goals = App.state.goals || [];
     container.innerHTML = `
@@ -55,11 +57,20 @@ const Goals = {
           <h2>Goals</h2>
           <button class="btn btn-sm plan-btn" data-act="plan-week" title="Auto-schedule goal tasks across the next 7 days">${icon('wand-magic-sparkles')} Plan my week</button>
         </div>
-        <button class="btn btn-primary" data-act="new">${icon('plus')} New goal</button>
+        <div class="range-switch">
+          ${[7, 30, 90].map(n => `<button class="tab ${this.range === n ? 'active' : ''}" data-goal-range="${n}" title="Focus-time window">${n}D</button>`).join('')}
+          <button class="btn btn-primary" data-act="new">${icon('plus')} New goal</button>
+        </div>
+      </div>
+      <div class="card chart-card">
+        <h3 class="card-title">${icon('stopwatch')} Focus time by goal — last ${this.range} days</h3>
+        <div class="chart-box"><canvas id="goal-focus-chart"></canvas></div>
       </div>
       <div id="goal-list" class="stack"></div>
     `;
     container.onclick = e => {
+      const rb = e.target.closest('[data-goal-range]');
+      if (rb) { this.range = Number(rb.dataset.goalRange); return this.page(container); }
       if (e.target.closest('[data-act="new"]')) return this.openForm();
       if (e.target.closest('[data-act="plan-week"]')) return this.planWeek();
       const btn = e.target.closest('[data-goal-action]');
@@ -73,8 +84,49 @@ const Goals = {
       if (act === 'add-sub') this.openForm(null, goal.id);
       if (act === 'add-task') Tasks.openForm({ goal_id: goal.id, scheduled_date: Utils.today() });
       if (act === 'sync') this.syncProgress(goal);
+      if (act === 'focus') {
+        Focus.presetGoal = goal.id;
+        location.hash = '#/focus';
+        toast('Focus page ready — goal preselected.', 'info');
+      }
     };
+    this.renderFocusChart();
     this.renderList();
+  },
+
+  /** 📊 horizontal bars: focus minutes per goal for the selected window. */
+  renderFocusChart() {
+    if (typeof Chart === 'undefined') return;
+    const rows = Analytics.goalFocusBreakdown(this.range).rows
+      .map(r => ({ ...r, title: ((App.state.goals || []).find(g => g.id === r.goalId) || {}).title || '(deleted goal)' }));
+    const hasAny = rows.length || Analytics.goalFocusBreakdown(this.range).unassigned > 0;
+    const canvas = qs('#goal-focus-chart', App.container());
+    if (!canvas) return;
+    if (!hasAny) {
+      canvas.parentElement.appendChild(el(`<div class="chart-empty">${icon('stopwatch')}<span>No focus time tagged to goals yet — pick a goal when starting the timer and your hours land here.</span></div>`));
+      canvas.remove();
+      return;
+    }
+    const labels = rows.map(r => r.title).concat(['Unassigned']);
+    const data = rows.map(r => r.minutes).concat([Analytics.goalFocusBreakdown(this.range).unassigned]);
+    const colors = rows.map(() => Charts.theme().primary).concat(['#64748b']);
+    Charts.make('goal-focus-chart', {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 4 }] },
+      options: {
+        indexAxis: 'y',
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => Utils.fmtMinutes(ctx.raw) } } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
+      }
+    });
+  },
+
+  /** ⏱ Focus minutes logged toward this goal in the last `days` days
+      (via Analytics.sessionGoalId — explicit goal tag beats task's goal). */
+  goalFocusMinutes(goalId, days) {
+    if (typeof Analytics === 'undefined' || !Analytics.goalFocusBreakdown) return 0;
+    const row = Analytics.goalFocusBreakdown(days || 7).rows.find(r => r.goalId === goalId);
+    return row ? row.minutes : 0;
   },
 
   renderList() {
@@ -111,6 +163,7 @@ const Goals = {
               </div>
             </div>
             <div class="task-actions">
+              <button class="btn btn-icon btn-ghost" data-goal-action="focus" title="Start a focus session for this goal">${icon('stopwatch')}</button>
               <button class="btn btn-icon btn-ghost" data-goal-action="add-task" title="Add linked task">${icon('plus')}</button>
               <button class="btn btn-icon btn-ghost" data-goal-action="add-sub" title="Add sub-goal">${icon('diagram-project')}</button>
               <button class="btn btn-icon btn-ghost" data-goal-action="sync" title="Sync progress from tasks">${icon('rotate')}</button>
@@ -124,6 +177,12 @@ const Goals = {
             <b class="goal-pct">${prog.pct}%</b>
           </div>
           <div class="muted goal-stats">
+            ${(() => {
+              const fm = this.goalFocusMinutes(g.id, this.range);
+              return fm > 0
+                ? `<span class="goal-focus-min">${icon('stopwatch', 'fa-xs')} <b>${Utils.fmtMinutes(fm)}</b> focus in last ${this.range}d</span> · `
+                : '';
+            })()}
             ${prog.hasTasks
               ? `Tasks: ${prog.completed} completed · ${prog.remaining} remaining · ${icon('rotate', 'fa-xs')} sync sets % from tasks`
               : `Manual progress — set it with ${icon('pencil', 'fa-xs')} edit`}
