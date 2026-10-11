@@ -169,6 +169,12 @@ const Reviews = {
     `;
 
     qs('#daily-save', container).addEventListener('click', () => this.saveDaily(today, existing));
+    // rating pills: sync the .on highlight when a radio is picked (the edit
+    // modal binds the same handler — the main form was missing it, so taps
+    // saved correctly but showed no visual feedback)
+    qsa('.scale-row', container).forEach(row => row.addEventListener('change', () => {
+      qsa('.day-pill', row).forEach(p => p.classList.toggle('on', qs('input', p).checked));
+    }));
     qs('#daily-history', container).innerHTML = past.length
       ? past.map(r => `
         <div class="card review-card" data-id="${r.id}">
