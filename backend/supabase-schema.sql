@@ -89,6 +89,7 @@ create table if not exists public.habit_logs (
 create table if not exists public.focus_sessions (
   id text primary key,
   task_id text default '',
+  goal_id text default '',
   category text default 'Other',
   start_time text default '',
   end_time text default '',
