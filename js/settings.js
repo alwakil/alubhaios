@@ -142,6 +142,17 @@ const Settings = {
           </div>
           <button class="btn" id="archive-run">${icon('box-archive')} Archive now</button>
         </div>
+        <div class="danger-row last" style="border-top:1px solid var(--border)">
+          <div>
+            <b>${icon('shield-halved')} Backup & restore</b>
+            <p class="muted small">Download a JSON snapshot of every table (tasks, goals, sessions, logs, settings…). Keep it anywhere — restore it later to rebuild your database exactly.</p>
+            <input type="file" id="restore-file" accept="application/json,.json" style="display:none">
+          </div>
+          <div class="form-actions" style="flex-direction:column;align-items:stretch;gap:8px">
+            <button class="btn" id="backup-download">${icon('download')} Download backup</button>
+            <button class="btn" id="restore-open">${icon('upload')} Restore from file</button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -291,6 +302,38 @@ const Settings = {
         .catch(e => App.handleError(e));
     });
 
+    /* --- backup & restore --- */
+    qs('#backup-download', container).addEventListener('click', async () => {
+      const btn = qs('#backup-download', container);
+      btn.disabled = true;
+      btn.innerHTML = `${icon('spinner', 'fa-spin')} Collecting…`;
+      try {
+        const data = await API.getAll();
+        const backup = {
+          app: 'AluBhaiOS',
+          version: CONFIG.VERSION,
+          exported_at: Utils.nowISO(),
+          tables: data
+        };
+        delete backup.tables.settingsRows;
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'alubhaios-backup-' + Utils.today() + '.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        const n = Object.keys(SB_TABLES).reduce((acc, k) => acc + ((data[k] || []).length || 0), 0);
+        toast(`💾 Backup downloaded — ${n} records across ${Object.keys(SB_TABLES).length} tables.`, 'success');
+      } catch (e) { App.handleError(e); }
+      btn.disabled = false;
+      btn.innerHTML = `${icon('download')} Download backup`;
+    });
+    qs('#restore-open', container).addEventListener('click', () => qs('#restore-file', container).click());
+    qs('#restore-file', container).addEventListener('change', e => this.restoreFromFile(e.target.files[0]));
+
     /* --- resets --- */
     qs('#reset-today', container).addEventListener('click', () => this.doReset('today', {
       title: "Reset today's progress?",
@@ -333,5 +376,44 @@ const Settings = {
         })
         .catch(e => App.handleError(e));
     });
+  },
+
+  /** 💾 Restore a backup JSON: upserts every record by id (existing rows
+      update, new rows insert — nothing is deleted). Guarded by typed GO. */
+  async restoreFromFile(file) {
+    if (!file) return;
+    let backup;
+    try { backup = JSON.parse(await file.text()); }
+    catch (e) { return toast('Not a valid JSON file — restore cancelled.', 'error'); }
+    if (!backup || backup.app !== 'AluBhaiOS' || typeof backup.tables !== 'object') {
+      return toast('This file is not an AluBhaiOS backup — restore cancelled.', 'error');
+    }
+    const counts = {};
+    let total = 0;
+    Object.keys(SB_TABLES).forEach(k => { counts[k] = (backup.tables[k] || []).length; total += counts[k]; });
+    const ok = await typeConfirm({
+      title: 'Restore backup?',
+      warning: `Records will be written into your live database.`,
+      message: `Backup from <b>${Utils.esc(String(backup.exported_at || 'unknown').slice(0, 10))}</b> contains <b>${total} records</b>: ` +
+        Object.keys(counts).filter(k => counts[k]).map(k => `${counts[k]} ${k}`).join(', ') +
+        '.<br><br>Existing rows with the same id are <b>overwritten</b>; nothing is deleted. App version: ' + Utils.esc(backup.version || '?'),
+      confirmText: 'Restore now',
+      keyword: 'RESTORE'
+    });
+    if (!ok) return;
+    toast('Restoring… this can take a minute.', 'info');
+    let done = 0, failed = 0;
+    for (const key of Object.keys(SB_TABLES)) {
+      const rows = backup.tables[key] || [];
+      for (const row of rows) {
+        try {
+          await API.upsert(SB_TABLES[key], Object.assign({}, row));
+          done++;
+        } catch (e) { failed++; }
+      }
+    }
+    if (failed) toast(`⚠ Restored ${done}/${total} — ${failed} failed (check connection).`, 'warn');
+    else toast(`✅ Restore complete — ${done} records written. Reloading…`, 'success');
+    setTimeout(() => App.reload(), 1200);
   }
 };

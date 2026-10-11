@@ -258,6 +258,58 @@ const Analytics = {
     };
   },
 
+  /** 🚀 Goal Velocity — projects when a goal finishes, from REAL momentum:
+      focus minutes logged toward the goal per week (last 28 days) vs the
+      estimated minutes left on its open tasks. Falls back to task count
+      when tasks have no estimates. Returns null when it cannot project. */
+  goalVelocity(goal) {
+    const tasks = (App.state.tasks || []).filter(t => t.goal_id === goal.id && !t._archived && t.status !== 'completed');
+    if (!tasks.length || goal.status === 'completed') return null;
+    const estLeft = tasks.reduce((a, t) => a + Utils.num(t.estimated_minutes), 0);
+    const hasEstimates = tasks.some(t => Utils.num(t.estimated_minutes) > 0);
+    // focus minutes toward this goal over the last 4 full weeks (today excluded)
+    const from = Utils.addDays(Utils.today(), -28);
+    let focusMin = 0;
+    (App.state.focusSessions || []).forEach(s => {
+      const d = this.sessionDate(s);
+      if (d < from || d > Utils.today()) return;
+      if (this.isDistractionSession(s)) return;
+      if (this.sessionGoalId(s) !== goal.id) return;
+      focusMin += Utils.num(s.duration_minutes);
+    });
+    const weeklyMinutes = focusMin / 4;
+    const velocityPct = Utils.clamp(Utils.num(goal.progress), 0, 100); // manual progress %
+    // two signals: minutes-based (preferred) and progress%-based
+    let weeksLeft = null, basis = '';
+    if (hasEstimates && weeklyMinutes >= 15) {
+      weeksLeft = estLeft / weeklyMinutes;
+      basis = 'minutes';
+    } else if (weeklyMinutes >= 15) {
+      // no estimates — assume the goal needs ~1000 min of focused work total,
+      // scaled by current manual progress
+      const assumedTotal = 1000;
+      const remainingMin = assumedTotal * (1 - velocityPct / 100);
+      if (remainingMin > 0) { weeksLeft = remainingMin / weeklyMinutes; basis = 'estimate~'; }
+    } else if (goal.target_date) {
+      // no real velocity yet — fall back to current pace vs target date
+      const p = (typeof GoalPace !== 'undefined' && GoalPace.pace) ? GoalPace.pace(goal) : null;
+      if (p && p.needPerMonth > 0) { weeksLeft = (100 - velocityPct) / p.needPerMonth * 4.34; basis = 'pace'; }
+    }
+    if (weeksLeft === null || !isFinite(weeksLeft) || weeksLeft <= 0) return null;
+    const etaDate = Utils.addDays(Utils.today(), Math.ceil(weeksLeft * 7));
+    const late = !!goal.target_date && etaDate > goal.target_date;
+    return {
+      weeklyMinutes: Math.round(weeklyMinutes),
+      estLeftMinutes: estLeft,
+      hasEstimates: hasEstimates,
+      basis: basis,
+      weeksLeft: Math.max(1, Math.ceil(weeksLeft)),
+      etaDate: etaDate,
+      late: late,
+      daysLate: late ? Math.max(1, Math.ceil((Utils.parseDate(etaDate) - Utils.parseDate(goal.target_date)) / 86400000)) : 0
+    };
+  },
+
   /** Best weekday for task completion (needs >=2 samples per weekday). */
   bestWeekday(days) {
     const daily = this.dailyStats(days);
@@ -370,6 +422,42 @@ const Analytics = {
     return { best: eligible[0], all: rows };
   },
 
+  /** ⏱ focus sessions on a date (helper for cross-table insights). */
+  focusMinutesOn(date) {
+    let m = 0;
+    (App.state.focusSessions || []).forEach(s => {
+      if (this.sessionDate(s) !== date) return;
+      if (this.isDistractionSession(s)) return;
+      m += Utils.num(s.duration_minutes);
+    });
+    return m;
+  },
+
+  /** 🕌 Salah × Focus — correlates full prayer days vs low prayer days with
+      focus minutes. Needs ≥3 full days AND ≥3 low days to speak. Pure. */
+  salahFocusInsight() {
+    const salahRows = App.state.salah || [];
+    if (!salahRows.length) return [];
+    const isTrue = v => v === true || String(v).toLowerCase() === 'true';
+    const full = [], low = [];
+    salahRows.forEach(r => {
+      const date = String(r.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= Utils.today()) return; // past days only
+      let n = 0;
+      ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].forEach(k => { if (isTrue(r[k])) n++; });
+      const fm = this.focusMinutesOn(date);
+      if (n === 5) full.push(fm); else if (n <= 2) low.push(fm);
+    });
+    if (full.length < 3 || low.length < 3) return [];
+    const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+    const diff = Math.round(avg(full) - avg(low));
+    if (diff < 10) return [];
+    return [{
+      icon: 'mosque', tone: 'good',
+      text: `On days you prayed all 5 prayers you focused ~${diff} minutes more than low-prayer days — barakah in your time.`
+    }];
+  },
+
   /** Human-readable insights generated from real comparisons. */
   insights() {
     const out = [];
@@ -453,6 +541,9 @@ const Analytics = {
 
     // 🔋 energy-aware insights (from daily review energy ratings)
     out.push(...this.energyInsights());
+
+    // 🕌 salah × focus correlation (needs ≥3 full-prayer days + ≥3 low days)
+    out.push(...this.salahFocusInsight());
 
     // 📝 distraction log — top trigger this week (needs ≥3 entries)
     out.push(...this.distractionLogInsight());

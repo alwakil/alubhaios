@@ -1170,3 +1170,17 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 
 /* per-goal focus total on the goal card */
 .goal-focus-min { color: var(--c-primary); }
+
+/* ============ v2.9.0 — velocity, salah insight, backup, presets ============ */
+
+/* goal velocity line on the goal card */
+.goal-velocity { margin-top: 4px; }
+.goal-velocity.vel-late { color: var(--c-danger, #ef4444); }
+
+/* one-tap pomodoro preset chips */
+.pomo-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}

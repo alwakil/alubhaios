@@ -197,6 +197,15 @@ const Goals = {
                 : '<span style="color:var(--c-danger)">⚠ behind pace</span>';
             return `<div class="muted small goal-pace">${icon('gauge-high')} Pace: expected ~${p.expected}% by now · you're at ${p.actual}% ${verdict} · need ~${p.needPerMonth}%/mo for ${p.monthsLeft} mo left</div>`;
           })()}
+          ${(() => {
+            const v = (typeof Analytics !== 'undefined' && Analytics.goalVelocity) ? Analytics.goalVelocity(g) : null;
+            if (!v) return '';
+            const basis = v.basis === 'minutes' ? `at your ${Utils.fmtMinutes(v.weeklyMinutes)}/wk pace` : v.basis === 'pace' ? 'at your target-date pace' : 'rough estimate';
+            const eta = `${Utils.fmtDay(v.etaDate)} (~${v.weeksLeft} wk${v.weeksLeft > 1 ? 's' : ''} left ${basis})`;
+            return v.late
+              ? `<div class="muted small goal-velocity vel-late">${icon('rocket')} Velocity: at this pace you'd finish ~${eta} — ${v.daysLate}d past your target date.</div>`
+              : `<div class="muted small goal-velocity">${icon('rocket')} Velocity: projected finish ~${eta}${g.target_date ? ' — before your target ✅' : ''}.</div>`;
+          })()}
         </div>
         ${children.map(c => this.goalCard(c, depth + 1)).join('')}
       </div>`;

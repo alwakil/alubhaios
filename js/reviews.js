@@ -44,7 +44,10 @@ const Reviews = {
     const xp = (typeof Gamify !== 'undefined' && Gamify.xpBetween) ? Gamify.xpBetween(weekStart, weekEnd) : 0;
     const level = (typeof Gamify !== 'undefined' && Gamify.level) ? Gamify.level(Gamify.xp()).level : 1;
     const bestStreak = (App.state.habits || []).reduce((a, h) => Math.max(a, Analytics.habitStreaks(h.id).best), 0);
-    return { avgScore, focusMin, tasksDone, habitPct, xp, level, bestStreak };
+    // ⏱ focus minutes per goal this week (top 3, for the share card)
+    const goalRows = Analytics.goalFocusBreakdown(7).rows.slice(0, 3)
+      .map(r => ({ title: ((App.state.goals || []).find(g => g.id === r.goalId) || {}).title || '(goal)', minutes: r.minutes }));
+    return { avgScore, focusMin, tasksDone, habitPct, xp, level, bestStreak, goalRows };
   },
 
   /** draw the 1000×620 share card on a canvas and open a download modal */
@@ -78,13 +81,17 @@ const Reviews = {
       ['⚡ XP this week', String(d.xp)],
       ['🏅 Level', 'Lv ' + d.level + ' · best streak ' + d.bestStreak + 'd']
     ];
+    if (d.goalRows && d.goalRows.length) {
+      d.goalRows.forEach(r => stats.push(['🎯 ' + r.title, Utils.fmtMinutes(r.minutes)]));
+    }
     stats.forEach((s2, i) => {
-      const y = 240 + i * 78;
+      const y = 240 + i * (stats.length > 5 ? 64 : 78);
       x.fillStyle = 'rgba(154, 158, 166, 0.10)';
-      if (x.roundRect) { x.beginPath(); x.roundRect(450, y - 40, 490, 62, 12); x.fill(); }
-      else x.fillRect(450, y - 40, 490, 62);
-      x.fillStyle = '#989da0'; x.font = '20px sans-serif'; x.fillText(s2[0], 480, y);
-      x.fillStyle = '#ffffff'; x.font = 'bold 30px sans-serif'; x.textAlign = 'right'; x.fillText(s2[1], 910, y);
+      const rowH = stats.length > 5 ? 50 : 62;
+      if (x.roundRect) { x.beginPath(); x.roundRect(450, y - 36, 490, rowH, 12); x.fill(); }
+      else x.fillRect(450, y - 36, 490, rowH);
+      x.fillStyle = '#989da0'; x.font = (stats.length > 5 ? '17px' : '20px') + ' sans-serif'; x.fillText(s2[0], 480, y);
+      x.fillStyle = '#ffffff'; x.font = 'bold ' + (stats.length > 5 ? '25px' : '30px') + ' sans-serif'; x.textAlign = 'right'; x.fillText(s2[1], 910, y);
       x.textAlign = 'left';
     });
     x.fillStyle = '#989da0'; x.font = '16px sans-serif';

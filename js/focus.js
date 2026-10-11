@@ -349,6 +349,7 @@ const Focus = {
       .then(rec => {
         this.pomo = null; this.savePomo();
         App.replaceRecord('focusSessions', rec);
+        this._syncActualMinutes(data.task_id, Utils.num(data.duration_minutes));
         App.refreshCurrent();
         toast(`🍅 Focus block saved (${Utils.fmtMinutes(minutes)}).`, 'success');
       })
@@ -370,7 +371,11 @@ const Focus = {
       notes: '[pomodoro]' + (noteSuffix ? ' ' + noteSuffix : '')
     };
     API.createFocusSession(data)
-      .then(rec => { App.replaceRecord('focusSessions', rec); toast(`🍅 ${Utils.fmtMinutes(minutes)} focus block saved.`, 'success'); })
+      .then(rec => {
+        App.replaceRecord('focusSessions', rec);
+        this._syncActualMinutes(data.task_id, Utils.num(data.duration_minutes));
+        toast(`🍅 ${Utils.fmtMinutes(minutes)} focus block saved.`, 'success');
+      })
       .catch(e => App.handleError(e));
   },
 
@@ -519,6 +524,16 @@ const Focus = {
     container.onclick = e => {
       const fmode = e.target.closest('[data-fmode]');
       if (fmode) { this.setView(fmode.dataset.fmode); return this.page(container); }
+      const preset = e.target.closest('[data-pomo-preset]');
+      if (preset) {
+        const [f, b] = preset.dataset.pomoPreset.split('-').map(Number);
+        const fi = qs('#pomo-focus-min', container), bi = qs('#pomo-break-min', container);
+        if (fi) fi.value = f;
+        if (bi) bi.value = b;
+        Utils.pref('pomoFocusMin', f);
+        Utils.pref('pomoBreakMin', b);
+        return this.renderPanel();
+      }
       const pbtn = e.target.closest('[data-pomo]');
       if (pbtn) return this.pomoAction(pbtn.dataset.pomo, container);
       const logBtn = e.target.closest('[data-log-distraction]');
@@ -542,6 +557,13 @@ const Focus = {
   },
 
   /** Goal dropdown markup — active goals first, then paused/completed. */
+  /** 🍅 one-tap pomodoro presets (custom values still editable below). */
+  POMO_PRESETS: [
+    { label: 'Classic 25/5', focus: 25, brk: 5 },
+    { label: 'Deep 50/10', focus: 50, brk: 10 },
+    { label: 'Long 90/20', focus: 90, brk: 20 }
+  ],
+
   goalOptionsHtml(selectedId) {
     const goals = App.state.goals || [];
     if (!goals.length) return '<option value="">— no goals yet —</option>';
@@ -602,6 +624,14 @@ const Focus = {
         panel.innerHTML = `
           <div class="focus-setup">
             <h3 class="card-title">${icon('clock-rotate-left')} Pomodoro cycles</h3>
+            <div class="pomo-presets">
+              ${this.POMO_PRESETS.map(p => {
+                const cur = Utils.num(qs('#pomo-focus-min', panel) ? qs('#pomo-focus-min', panel).value : Utils.pref('pomoFocusMin') || 25);
+                const curB = Utils.num(qs('#pomo-break-min', panel) ? qs('#pomo-break-min', panel).value : Utils.pref('pomoBreakMin') || 5);
+                const active = cur === p.focus && curB === p.brk;
+                return `<button type="button" class="btn btn-sm ${active ? 'btn-primary' : ''}" data-pomo-preset="${p.focus}-${p.brk}">${p.label}</button>`;
+              }).join('')}
+            </div>
             <div class="field-row">
               <label class="field"><span>Focus minutes</span>
                 <input type="number" id="pomo-focus-min" min="5" max="180" step="5" value="${Utils.esc(Utils.pref('pomoFocusMin') || 25)}"></label>
@@ -802,6 +832,17 @@ const Focus = {
       });
   },
 
+  /** ⏱ Add a saved session's minutes to its task's actual_minutes (fire-
+      and-forget — a failed sync must never break the session save). */
+  _syncActualMinutes(taskId, minutes) {
+    const t = (App.state.tasks || []).find(x => x.id === taskId);
+    if (!t || !minutes || minutes <= 0) return;
+    const next = Utils.num(t.actual_minutes) + minutes;
+    API.updateTask(taskId, { actual_minutes: next })
+      .then(rec => { App.replaceRecord('tasks', rec); if (t.status === 'completed') App.refreshCurrent(); })
+      .catch(() => { /* silent */ });
+  },
+
   /* ---------------- save dialog (stopwatch) ---------------- */
   openSaveModal() {
     const t = this.timer;
@@ -875,6 +916,7 @@ const Focus = {
         .then(rec => {
           this.timer = null; this.save();
           App.replaceRecord('focusSessions', rec);
+          this._syncActualMinutes(data.task_id, Utils.num(data.duration_minutes));
           m.close();
           App.refreshCurrent();
           toast('Focus session saved 💪', 'success');
