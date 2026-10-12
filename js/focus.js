@@ -88,7 +88,9 @@ const Focus = {
     if (!t || !t.running || t.endsAt > Date.now()) return;
     const over = Date.now() - t.endsAt;
     if (t.phase === 'focus') {
-      this.logSession(t.focusMin, 'auto (while away)');
+      // log against the REAL expiry time — start_time = expiry − block length —
+      // so a block that ran out days ago is credited to that day, not today
+      this.logSession(t.focusMin, 'auto (while away)', t.endsAt);
       this.advancePhase(true);
     }
     // if the break also expired long ago, restart a fresh focus block
@@ -96,6 +98,10 @@ const Focus = {
       t.phase = 'focus';
       t.endsAt = Date.now() + t.focusMin * 60000;
       t.remainingMs = 0;
+      setTimeout(() => {
+        toast('☕ Break expired while away — a fresh ' + t.focusMin + ' min focus block was started.', 'info');
+        notify('☕ Break over', 'Fresh focus block started after the long break.');
+      }, 800);
     }
     this.savePomo();
   },
@@ -344,8 +350,7 @@ const Focus = {
       interruptions: 0,
       goal_id: t ? t.goalId : '',
       notes: '[pomodoro]'
-    };
-    API.createFocusSession(data)
+    };    API.createFocusSession(data)
       .then(rec => {
         this.pomo = null; this.savePomo();
         App.replaceRecord('focusSessions', rec);
@@ -356,14 +361,17 @@ const Focus = {
       .catch(e => App.handleError(e));
   },
 
-  /** Fire-and-forget session log used when phases roll over automatically. */
-  logSession(minutes, noteSuffix) {
+  /** Fire-and-forget session log used when phases roll over automatically.
+      `endMs` anchors the block to its real end (defaults to now) so a block
+      that ran out while the app was closed is logged on the day it ended. */
+  logSession(minutes, noteSuffix, endMs) {
     const t = this.pomo;
+    const end = endMs || Date.now();
     const data = {
       task_id: t ? t.taskId : '',
       category: t ? t.category : 'Learning',
-      start_time: this.epochISO(Date.now() - minutes * 60000),
-      end_time: Utils.nowISO(),
+      start_time: this.epochISO(end - minutes * 60000),
+      end_time: this.epochISO(end),
       duration_minutes: minutes,
       focus_rating: '',
       interruptions: 0,

@@ -64,11 +64,13 @@ const Options = {
     return true;
   },
 
-  /** Removes an option: user additions are deleted, defaults are hidden. */
+  /** Removes an option: user additions are deleted, defaults are hidden.
+      Case-insensitive like add(), so "web" removes a stored "Web". */
   async remove(group, value) {
     const r = JSON.parse(JSON.stringify(this.raw()));
     const g = r[group] = r[group] || { added: [], hidden: [] };
-    g.added = (g.added || []).filter(x => x !== value);
+    const low = String(value).toLowerCase();
+    g.added = (g.added || []).filter(x => String(x).toLowerCase() !== low);
     if (this.isDefault(group, value)) g.hidden = [...new Set([...(g.hidden || []), value])];
     await this.persist(r);
     return true;

@@ -78,7 +78,7 @@ const API = {
             apikey: this.key(),
             Authorization: 'Bearer ' + this.key(),
             'Content-Type': 'application/json',
-            Prefer: opts.prefer || ''
+            Prefer: [opts.prefer, opts.wantCount ? 'count=exact' : ''].filter(Boolean).join(',')
           },
           body: opts.body ? JSON.stringify(opts.body) : undefined,
           signal: ctrl.signal
@@ -89,6 +89,13 @@ const API = {
           const err = new Error('Supabase error (HTTP ' + res.status + '): ' + txt.slice(0, 200));
           err.code = res.status >= 500 || res.status === 429 ? 'NETWORK' : 'API';
           throw err;
+        }
+        // count=exact responses carry the affected-row count in Content-Range:
+        // "0-N/total" (or "*/total" when the range itself is empty)
+        if (opts.wantCount) {
+          const cr = res.headers.get('content-range') || '';
+          const total = Number(String(cr).split('/')[1]);
+          return Number.isFinite(total) ? total : 0;
         }
         const txt = await res.text();
         if (window.App && App.hideError) App.hideError(); // success clears an earlier hiccup banner
@@ -304,33 +311,51 @@ const API = {
     const inRange = d => type === 'today' ? d === today
       : type === 'week' ? (d >= Utils.addDays(today, -6) && d <= today)
       : false;
+    const counts = {};
+    const del = async (table, qs) => {
+      const n = await this.rest(table, { method: 'DELETE', qs, wantCount: true });
+      if (n) counts[table] = n;
+    };
+    const countPatch = async (table, ids, patch) => {
+      for (const id of ids) await this.patchT(table, id, patch);
+      if (ids.length) counts[table + '_reset'] = ids.length;
+    };
 
     if (type === 'today' || type === 'week') {
       // un-complete tasks finished in range
-      for (const t of (App.state.tasks || [])) {
-        if (t.status === 'completed' && String(t.completed_at || '').slice(0, 10) && inRange(String(t.completed_at).slice(0, 10))) {
-          await this.patchT('tasks', t.id, { status: 'pending', completed_at: '' });
+      const from = type === 'today' ? today : Utils.addDays(today, -6);
+      const done = (App.state.tasks || []).filter(t => t.status === 'completed' &&
+        String(t.completed_at || '').slice(0, 10) && inRange(String(t.completed_at).slice(0, 10)));
+      await countPatch('tasks', done.map(t => t.id), { status: 'pending', completed_at: '' });
+      await del('focus_sessions', '?start_time=gte.' + from);
+      await del('habit_logs', '?date=gte.' + from + '&date=lte.' + today);
+      await del('daily_reviews', '?date=gte.' + from + '&date=lte.' + today);
+      // the week reset dialog promises to delete this week's weekly review too
+      if (type === 'week') {
+        const ws = App.state.weeklyReviews || [];
+        const target = ws.find(w => w.week_start && w.week_start >= from && w.week_start <= today);
+        if (target) {
+          await this.rest('weekly_reviews', { method: 'DELETE', qs: '?week_start=eq.' + encodeURIComponent(target.week_start), wantCount: true });
+          counts.weekly_reviews = 1;
         }
       }
-      await this.rest('focus_sessions', { method: 'DELETE', qs: '?start_time=gte.' + (type === 'today' ? today : Utils.addDays(today, -6)) });
-      await this.rest('habit_logs', { method: 'DELETE', qs: '?date=gte.' + (type === 'today' ? today : Utils.addDays(today, -6)) + '&date=lte.' + today });
-      await this.rest('daily_reviews', { method: 'DELETE', qs: '?date=gte.' + (type === 'today' ? today : Utils.addDays(today, -6)) + '&date=lte.' + today });
     } else if (type === 'progress') {
       for (const tb of ['tasks', 'archive', 'focus_sessions', 'habit_logs', 'daily_reviews', 'weekly_reviews']) {
-        await this.rest(SB_TABLES[tb] || tb, { method: 'DELETE', qs: '?id=not.is.null' }); // delete all
+        await del(SB_TABLES[tb] || tb, '?id=not.is.null');
       }
-      for (const h of ((window.App && App.state && App.state.habits) || [])) await this.patchT('habits', h.id, { current_streak: '0', best_streak: '0' });
+      const habits = ((window.App && App.state && App.state.habits) || []);
+      await countPatch('habits', habits.map(h => h.id), { current_streak: '0', best_streak: '0' });
     } else if (type === 'everything') {
       // settings has no `id` column (its key is `key`), so it is wiped last and
       // separately — `?id=...` there fails with 42703 and aborts the whole reset.
       for (const t of Object.values(SB_TABLES)) {
-        await this.rest(t, { method: 'DELETE', qs: '?id=not.is.null' });
+        await del(t, '?id=not.is.null');
       }
-      await this.rest('settings', { method: 'DELETE', qs: '?key=not.is.null' });
+      await del('settings', '?key=not.is.null');
     } else {
       throw new Error('Unknown reset type: ' + type + ' (use today | week | progress | everything)');
     }
-    return { type: type };
+    return { type: type, counts: counts };
   },
 
   /* ---------- helpers shared above ---------- */
