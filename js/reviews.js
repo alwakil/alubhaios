@@ -25,7 +25,13 @@ const Reviews = {
       const printBtn = e.target.closest('#wr-print');
       if (printBtn) { window.print(); return; }
       const shareBtn = e.target.closest('#wr-share');
-      if (shareBtn) { this.openShareCard(avgScore, sum('focusMinutes'), sum('tasksCompleted'), habitPct, weekStart, weekEnd); return; }
+      if (shareBtn) {
+        // Derive the week here: renderWeekly()'s avgScore/sum/habitPct/weekStart
+        // are locals there and invisible in this handler's scope.
+        const ws = Utils.addDays(Utils.startOfWeek(Utils.today()), this.weekOffset * 7);
+        this.openShareCard(ws, Utils.addDays(ws, 6));
+        return;
+      }
       this.handleAction(e);
     };
     if (this.tab === 'daily') this.renderDaily(qs('#review-body', container));
@@ -50,8 +56,9 @@ const Reviews = {
     return { avgScore, focusMin, tasksDone, habitPct, xp, level, bestStreak, goalRows };
   },
 
-  /** draw the 1000×620 share card on a canvas and open a download modal */
-  openShareCard(avgScore, focusMin, tasksDone, habitPct, weekStart, weekEnd) {
+  /** draw the 1000×620 share card on a canvas and open a download modal.
+      All numbers come from shareCardData(), so only the week is needed. */
+  openShareCard(weekStart, weekEnd) {
     const d = this.shareCardData(weekStart, weekEnd);
     const c = document.createElement('canvas');
     c.width = 1000; c.height = 620;

@@ -135,6 +135,23 @@ const Utils = {
   categoryColor(cat) { return CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other; },
   priorityColor(p) { return PRIORITY_COLORS[p] || PRIORITY_COLORS.low; },
 
+  /** An escaped href that can only be http(s). Saved links are user input, so
+      esc() alone is not enough — `javascript:` would run on click. */
+  safeUrl(url) {
+    const s = String(url == null ? '' : url).trim();
+    if (!s) return '#';
+    if (/^(https?:)?\/\/[^/\s]+/i.test(s)) return this.esc(s);
+    if (/^[^\s:]+@[^\s:]+\.[^\s:]+$/.test(s)) return this.esc('mailto:' + s);
+    return '#';
+  },
+
+  /** Render a user-supplied link, or nothing at all when it is not a real URL. */
+  linkBtn(url, title) {
+    const href = this.safeUrl(url);
+    if (href === '#') return '';
+    return `<a class="btn btn-icon btn-ghost" href="${href}" target="_blank" rel="noopener" title="${title || 'Open link'}">${icon('arrow-up-right-from-square')}</a>`;
+  },
+
   stars(rating) {
     const n = this.clamp(Math.round(this.num(rating)), 0, 5);
     let out = '';

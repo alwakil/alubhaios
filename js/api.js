@@ -317,14 +317,16 @@ const API = {
       await this.rest('daily_reviews', { method: 'DELETE', qs: '?date=gte.' + (type === 'today' ? today : Utils.addDays(today, -6)) + '&date=lte.' + today });
     } else if (type === 'progress') {
       for (const tb of ['tasks', 'archive', 'focus_sessions', 'habit_logs', 'daily_reviews', 'weekly_reviews']) {
-        await this.rest(SB_TABLES[tb] || tb, { method: 'DELETE', qs: '?id=neq.' }); // delete all
+        await this.rest(SB_TABLES[tb] || tb, { method: 'DELETE', qs: '?id=not.is.null' }); // delete all
       }
       for (const h of ((window.App && App.state && App.state.habits) || [])) await this.patchT('habits', h.id, { current_streak: '0', best_streak: '0' });
     } else if (type === 'everything') {
-      for (const t of Object.values(SB_TABLES).concat(['settings'])) {
-        await this.rest(t, { method: 'DELETE', qs: '?id=neq.' });
+      // settings has no `id` column (its key is `key`), so it is wiped last and
+      // separately — `?id=...` there fails with 42703 and aborts the whole reset.
+      for (const t of Object.values(SB_TABLES)) {
+        await this.rest(t, { method: 'DELETE', qs: '?id=not.is.null' });
       }
-      await this.rest('settings', { method: 'DELETE', qs: '?key=neq.' });
+      await this.rest('settings', { method: 'DELETE', qs: '?key=not.is.null' });
     } else {
       throw new Error('Unknown reset type: ' + type + ' (use today | week | progress | everything)');
     }

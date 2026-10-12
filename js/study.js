@@ -117,7 +117,7 @@ const Study = {
           <div class="muted small" style="margin-top:4px">${doneU} / ${totalU} units${m.notes ? ' · ' + Utils.esc(m.notes) : ''}</div>
         </div>
         <div class="task-actions">
-          ${m.link ? `<a class="btn btn-icon btn-ghost" href="${Utils.esc(m.link)}" target="_blank" rel="noopener" title="Open link">${icon('arrow-up-right-from-square')}</a>` : ''}
+          ${Utils.linkBtn(m.link, 'Open module link')}
           <button class="btn btn-sm" data-study-act="inc" title="+1 unit">${icon('plus')}</button>
           <button class="btn btn-icon btn-ghost" data-study-act="edit" title="Edit">${icon('pencil')}</button>
           <button class="btn btn-icon btn-ghost danger" data-study-act="delete" title="Delete">${icon('trash')}</button>
@@ -277,7 +277,7 @@ const Study = {
           ${c.notes ? `<div class="muted small">${Utils.esc(c.notes)}</div>` : ''}
         </div>
         <div class="task-actions">
-          ${c.link ? `<a class="btn btn-icon btn-ghost" href="${Utils.esc(c.link)}" target="_blank" rel="noopener" title="Open link">${icon('arrow-up-right-from-square')}</a>` : ''}
+          ${Utils.linkBtn(c.link, 'Open challenge link')}
           <button class="btn btn-sm ${solvedC ? '' : 'btn-success'}" data-study-act="toggle-solve" title="${solvedC ? 'Mark unsolved' : 'Mark solved'}">
             ${solvedC ? icon('rotate-left') : icon('check')} ${solvedC ? '' : 'Solve'}
           </button>
