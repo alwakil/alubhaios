@@ -34,7 +34,7 @@ const Dashboard = {
           </div>
           <h3 class="card-title">Productivity Score</h3>
           <div class="score-breakdown">
-            <div><span class="sb-label">Tasks</span><span class="sb-val">${Math.round(t.tasksPlanned > 0 || t.tasksCompletedAt > 0 ? (t.tasksPlanned > 0 ? t.tasksCompleted / t.tasksPlanned : 1) * 40 : 0)}/40</span></div>
+            <div><span class="sb-label">Tasks</span><span class="sb-val">${Math.round(t.tasksPlanned > 0 ? (t.tasksCompleted / t.tasksPlanned) * 40 : 0)}/40</span></div>
             <div><span class="sb-label">Focus</span><span class="sb-val">${Math.round(Math.min(1, t.focusMinutes / Analytics.focusGoalMinutes()) * 30)}/30</span></div>
             <div><span class="sb-label">Habits</span><span class="sb-val">${Math.round(t.habitTotal ? t.habitDone / t.habitTotal * 20 : 0)}/20</span></div>
             <div><span class="sb-label">Distraction</span><span class="sb-val">-${Math.min(10, Math.round(t.distractionMinutes / 6))}</span></div>

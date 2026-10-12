@@ -9,6 +9,11 @@
      focus   30 pts  focus minutes vs Settings daily focus goal
      habits  20 pts  habits completed today / enabled habits
      distraction -10 max (60+ distraction minutes = full penalty)
+
+   Task attribution: the ratio for a day is "tasks scheduled for that day"
+   vs "tasks actually finished on that day". Ticking a task off on a
+   different day no longer scores it here — finishing early credits the
+   earlier day, finishing late credits the day the work really happened.
    ============================================================ */
 'use strict';
 
@@ -36,11 +41,22 @@ const Analytics = {
     // freeze check-ins keep streaks alive but don't count as real completions
     const realLogs = logs.filter(l => !/❄|freeze/i.test(String(l.note || '')));
 
-    const tasksToday = (App.state.tasks || []).filter(t => t.scheduled_date === date);
+    const schedDate = t => String(t.scheduled_date || '').slice(0, 10);
+    // The day a task actually got finished. Rows saved before completed_at was
+    // recorded fall back to their scheduled day, so nothing silently loses credit.
+    const doneDate = t => this.taskCompletedDate(t) || (t.status === 'completed' ? schedDate(t) : '');
+    // Credit follows the day the work happened: `planned` = tasks scheduled for
+    // this day, `completed` = tasks actually finished on it. A task ticked off
+    // on another day no longer scores here (early finish → earlier day, late
+    // finish → the day it was really done).
+    const scheduledToday = (App.state.tasks || []).filter(t => schedDate(t) === date);
+    const doneToday = (App.state.tasks || []).filter(t => doneDate(t) === date);
+    // Denominator never drops below what was actually finished, so a day that
+    // only finished carried-over work still reads as a full ratio, not >100%.
+    const plannedCount = Math.max(scheduledToday.length, doneToday.length);
+    const completedOfPlanned = doneToday.length;
     // "missed" = was scheduled on a PAST day and is still not done today
-    const tasksMissed = tasksToday.filter(t => t.status !== 'completed' && date < Utils.today()).length;
-    const doneToday = (App.state.tasks || []).filter(t => this.taskCompletedDate(t) === date);
-    const completedOfPlanned = tasksToday.filter(t => t.status === 'completed').length;
+    const tasksMissed = scheduledToday.filter(t => t.status !== 'completed' && date < Utils.today()).length;
 
     let focusMin = 0, distrMin = 0, actualMin = 0;
     (App.state.focusSessions || []).forEach(s => {
@@ -49,15 +65,15 @@ const Analytics = {
       if (this.isDistractionSession(s)) distrMin += m; else focusMin += m;
     });
     (App.state.tasks || []).forEach(t => {
-      if (this.taskCompletedDate(t) === date) actualMin += Utils.num(t.actual_minutes);
+      if (doneDate(t) === date) actualMin += Utils.num(t.actual_minutes);
     });
-    const plannedMin = tasksToday.reduce((a, t) => a + Utils.num(t.estimated_minutes), 0);
+    const plannedMin = scheduledToday.reduce((a, t) => a + Utils.num(t.estimated_minutes), 0);
 
     const habitDone = realLogs.filter(l => habitIds.indexOf(l.habit_id) !== -1).length;
     const habitTotal = enabledHabits.length;
 
     const score = this.scoreDay({
-      planned: tasksToday.length,
+      planned: plannedCount,
       completed: completedOfPlanned,
       focusMinutes: focusMin,
       distractionMinutes: distrMin,
@@ -65,16 +81,16 @@ const Analytics = {
       habitTotal: habitTotal
     });
 
-    const active = tasksToday.length > 0 || focusMin > 0 || distrMin > 0 || habitDone > 0;
+    const active = plannedCount > 0 || doneToday.length > 0 || focusMin > 0 || distrMin > 0 || habitDone > 0;
 
     return {
       date: date,
       score: score,
       active: active,
-      tasksPlanned: tasksToday.length,
+      tasksPlanned: plannedCount,
       tasksCompleted: completedOfPlanned,
       tasksCompletedAt: doneToday.length,
-      tasksRemaining: tasksToday.length - completedOfPlanned,
+      tasksRemaining: Math.max(0, plannedCount - completedOfPlanned),
       tasksMissed: tasksMissed,
       focusMinutes: focusMin,
       distractionMinutes: distrMin,
