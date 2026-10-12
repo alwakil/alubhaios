@@ -56,31 +56,12 @@ const Reviews = {
     return { avgScore, focusMin, tasksDone, habitPct, xp, level, bestStreak, goalRows };
   },
 
-  /** draw the 1000×620 share card on a canvas and open a download modal.
+  /** draw the share card on a canvas and open a download modal.
+      Card height grows with the stat-row count so goal rows are never clipped;
+      the 5-row card keeps its original 1000×620 layout.
       All numbers come from shareCardData(), so only the week is needed. */
   openShareCard(weekStart, weekEnd) {
     const d = this.shareCardData(weekStart, weekEnd);
-    const c = document.createElement('canvas');
-    c.width = 1000; c.height = 620;
-    const x = c.getContext('2d');
-    const bg = x.createLinearGradient(0, 0, 1000, 620);
-    bg.addColorStop(0, '#1b1d21'); bg.addColorStop(1, '#26282d');
-    x.fillStyle = bg; x.fillRect(0, 0, 1000, 620);
-    x.fillStyle = '#6366f1'; x.fillRect(0, 0, 1000, 8);
-    x.fillStyle = '#f5c518'; x.font = 'bold 42px sans-serif'; x.fillText('AluBhaiOS', 60, 92);
-    x.fillStyle = '#989da0'; x.font = '20px sans-serif';
-    x.fillText(String(weekStart).split('-').reverse().join('/') + ' — ' + String(weekEnd).split('-').reverse().join('/'), 60, 126);
-    // productivity ring
-    x.lineWidth = 18; x.strokeStyle = 'rgba(154, 158, 166, 0.18)';
-    x.beginPath(); x.arc(230, 330, 112, 0, Math.PI * 2); x.stroke();
-    x.strokeStyle = '#10b981';
-    x.beginPath(); x.arc(230, 330, 112, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (d.avgScore / 100)); x.stroke();
-    x.fillStyle = '#ffffff'; x.font = 'bold 64px sans-serif'; x.textAlign = 'center';
-    x.fillText(String(d.avgScore), 230, 348);
-    x.fillStyle = '#989da0'; x.font = '18px sans-serif';
-    x.fillText('avg productivity', 230, 384);
-    x.textAlign = 'left';
-    // stat rows
     const stats = [
       ['⏱ Focus time', Utils.fmtMinutes(d.focusMin)],
       ['✅ Tasks done', String(d.tasksDone)],
@@ -91,18 +72,45 @@ const Reviews = {
     if (d.goalRows && d.goalRows.length) {
       d.goalRows.forEach(r => stats.push(['🎯 ' + r.title, Utils.fmtMinutes(r.minutes)]));
     }
+    const compact = stats.length > 5;
+    const spacing = compact ? 64 : 78;
+    const rowH = compact ? 50 : 62;
+    const lastY = 240 + (stats.length - 1) * spacing;
+    const footerY = compact ? lastY + rowH - 36 + 32 : 586;
+    const H = compact ? footerY + 34 : 620;
+    const c = document.createElement('canvas');
+    c.width = 1000; c.height = H;
+    const x = c.getContext('2d');
+    const bg = x.createLinearGradient(0, 0, 1000, H);
+    bg.addColorStop(0, '#1b1d21'); bg.addColorStop(1, '#26282d');
+    x.fillStyle = bg; x.fillRect(0, 0, 1000, H);
+    x.fillStyle = '#6366f1'; x.fillRect(0, 0, 1000, 8);
+    x.fillStyle = '#f5c518'; x.font = 'bold 42px sans-serif'; x.fillText('AluBhaiOS', 60, 92);
+    x.fillStyle = '#989da0'; x.font = '20px sans-serif';
+    x.fillText(String(weekStart).split('-').reverse().join('/') + ' — ' + String(weekEnd).split('-').reverse().join('/'), 60, 126);
+    // productivity ring (centred against the stat rows when the card grows)
+    const ringCy = compact ? ((240 - 36) + (lastY - 36 + rowH)) / 2 : 330;
+    x.lineWidth = 18; x.strokeStyle = 'rgba(154, 158, 166, 0.18)';
+    x.beginPath(); x.arc(230, ringCy, 112, 0, Math.PI * 2); x.stroke();
+    x.strokeStyle = '#10b981';
+    x.beginPath(); x.arc(230, ringCy, 112, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (d.avgScore / 100)); x.stroke();
+    x.fillStyle = '#ffffff'; x.font = 'bold 64px sans-serif'; x.textAlign = 'center';
+    x.fillText(String(d.avgScore), 230, ringCy + 18);
+    x.fillStyle = '#989da0'; x.font = '18px sans-serif';
+    x.fillText('avg productivity', 230, ringCy + 54);
+    x.textAlign = 'left';
+    // stat rows
     stats.forEach((s2, i) => {
-      const y = 240 + i * (stats.length > 5 ? 64 : 78);
+      const y = 240 + i * spacing;
       x.fillStyle = 'rgba(154, 158, 166, 0.10)';
-      const rowH = stats.length > 5 ? 50 : 62;
       if (x.roundRect) { x.beginPath(); x.roundRect(450, y - 36, 490, rowH, 12); x.fill(); }
       else x.fillRect(450, y - 36, 490, rowH);
-      x.fillStyle = '#989da0'; x.font = (stats.length > 5 ? '17px' : '20px') + ' sans-serif'; x.fillText(s2[0], 480, y);
-      x.fillStyle = '#ffffff'; x.font = 'bold ' + (stats.length > 5 ? '25px' : '30px') + ' sans-serif'; x.textAlign = 'right'; x.fillText(s2[1], 910, y);
+      x.fillStyle = '#989da0'; x.font = (compact ? '17px' : '20px') + ' sans-serif'; x.fillText(s2[0], 480, y);
+      x.fillStyle = '#ffffff'; x.font = 'bold ' + (compact ? '25px' : '30px') + ' sans-serif'; x.textAlign = 'right'; x.fillText(s2[1], 910, y);
       x.textAlign = 'left';
     });
     x.fillStyle = '#989da0'; x.font = '16px sans-serif';
-    x.fillText('built with AluBhaiOS — plan · execute · measure · improve', 60, 586);
+    x.fillText('built with AluBhaiOS — plan · execute · measure · improve', 60, footerY);
     const url = c.toDataURL('image/png');
     openModal({
       title: icon('share-nodes') + ' Weekly share card',
