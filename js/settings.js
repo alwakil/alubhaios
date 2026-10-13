@@ -402,15 +402,16 @@ const Settings = {
     });
     if (!ok) return;
     toast('Restoring… this can take a minute.', 'info');
+    // one bulk upsert per table (was one request per row — a 2000-record
+    // backup used to fire 2000 POSTs)
     let done = 0, failed = 0;
     for (const key of Object.keys(SB_TABLES)) {
       const rows = backup.tables[key] || [];
-      for (const row of rows) {
-        try {
-          await API.upsert(SB_TABLES[key], Object.assign({}, row));
-          done++;
-        } catch (e) { failed++; }
-      }
+      if (!rows.length) continue;
+      try {
+        await API.upsertMany(SB_TABLES[key], rows.map(row => Object.assign({}, row)));
+        done += rows.length;
+      } catch (e) { failed += rows.length; }
     }
     if (failed) toast(`⚠ Restored ${done}/${total} — ${failed} failed (check connection).`, 'warn');
     else toast(`✅ Restore complete — ${done} records written. Reloading…`, 'success');

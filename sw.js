@@ -7,7 +7,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'alubhaios-v2.10.3';
+const CACHE = 'alubhaios-v2.10.4';
 /* everything index.html references + the fonts its vendor CSS pulls in —
    offline must open the full app, not a blank screen */
 const CORE = [
@@ -79,18 +79,21 @@ self.addEventListener('fetch', event => {
   if (new URL(req.url).origin !== self.location.origin) return; // GAS API: never touched
 
   // page navigations: network first, offline -> cached index.html
+  // ignoreSearch: ?utm_... or ?source=pwa variants still hit the cached page
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then(res => { caches.open(CACHE).then(c => c.put('index.html', res.clone())); return res; })
-        .catch(() => caches.match('index.html'))
+        .catch(() => caches.match('index.html', { ignoreSearch: true }))
     );
     return;
   }
 
-  // everything else: cache first, then network (and keep a copy)
+  // everything else: cache first, then network (and keep a copy).
+  // ignoreSearch so a stale ?v=2.10.4 URL still serves the freshly cached
+  // ?v=2.10.4 asset instead of refetching from the network.
   event.respondWith(
-    caches.match(req).then(hit => hit ||
+    caches.match(req, { ignoreSearch: true }).then(hit => hit ||
       fetch(req).then(res => {
         if (res.ok) caches.open(CACHE).then(c => c.put(req, res.clone()));
         return res;

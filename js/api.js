@@ -56,9 +56,6 @@ const API = {
     return /^https:\/\/.+/.test(this.url()) && this.key().length > 20;
   },
 
-  /* kept so Settings' old "Backend connection" wording still works */
-  isRead() { return true; },
-
   /** Low-level REST call. method: GET/POST/PATCH/DELETE. Returns parsed JSON rows (or null). */
   async rest(table, opts, _retries) {
     if (!this.configured()) {
@@ -144,6 +141,20 @@ const API = {
     });
   },
 
+  /** upsert many rows in ONE request (PostgREST accepts a JSON array body). */
+  upsertMany(table, recs) {
+    if (!recs.length) return Promise.resolve(null);
+    const on = SB_CONFLICT[table];
+    const qs = on ? `?on_conflict=${on.join(',')}` : '';
+    return this.rest(table, {
+      method: 'POST',
+      qs,
+      body: recs,
+      headers: undefined,
+      prefer: 'resolution=merge-duplicates,return=representation'
+    });
+  },
+
   async patch(table, id, patchObj) {
     const rows = await this.rest(table, {
       method: 'PATCH',
@@ -153,6 +164,19 @@ const API = {
     });
     if (!rows || !rows.length) throw new Error('Record not found in ' + table + ' (' + id + ')');
     return rows[0];
+  },
+
+  /** patch every row whose id is in ids with the SAME patch — one request
+      instead of N (uses the CSV form of the `in` operator). */
+  async patchMany(table, ids, patchObj) {
+    if (!ids.length) return [];
+    const list = ids.map(id => encodeURIComponent(id)).join(',');
+    return this.rest(table, {
+      method: 'PATCH',
+      qs: '?id=in.(' + list + ')&select=*',
+      body: patchObj,
+      prefer: 'return=representation'
+    });
   },
 
   async remove(table, id) {
@@ -183,10 +207,6 @@ const API = {
     // lightweight connectivity check against a real table
     return this.rest('settings', { method: 'GET', qs: '?select=key&limit=1' })
       .then(() => ({ ok: true, serverTime: new Date().toISOString(), backend: 'Supabase' }));
-  },
-  getAnalytics(range) {
-    // frontend computes analytics from App.state — return a bundle-shaped stub
-    return Promise.resolve({ days: range || 90, generatedAt: new Date().toISOString() });
   },
 
   /* -------- tasks -------- */
@@ -288,8 +308,9 @@ const API = {
   /* -------- settings / reset -------- */
   async saveSettings(settingsObj) {
     const keys = Object.keys(settingsObj || {});
-    for (const k of keys) {
-      await this.upsert('settings', { key: k, value: String(settingsObj[k]) });
+    // one bulk upsert instead of one request per key
+    if (keys.length) {
+      await this.upsertMany('settings', keys.map(k => ({ key: k, value: String(settingsObj[k]) })));
     }
     if (window.App && App.settings) Object.assign(App.settings, settingsObj);
     return { settings: settingsObj };
@@ -299,9 +320,9 @@ const API = {
     const cutoff = Utils.addDays(Utils.today(), -(Number(days) || 120));
     const old = (((window.App && App.state) && App.state.tasks) || []).filter(t => !t._archived && t.status === 'completed' &&
       String(t.completed_at || '').slice(0, 10) && String(t.completed_at).slice(0, 10) < cutoff);
-    for (const t of old) {
-      await this.upsert('archive', t);
-      await this.rest('tasks', { method: 'DELETE', qs: '?id=eq.' + encodeURIComponent(t.id) });
+    if (old.length) {
+      await this.upsertMany('archive', old);
+      await this.rest('tasks', { method: 'DELETE', qs: '?id=in.(' + old.map(t => encodeURIComponent(t.id)).join(',') + ')' });
     }
     return { moved: old.length, cutoff: cutoff };
   },
@@ -317,7 +338,11 @@ const API = {
       if (n) counts[table] = n;
     };
     const countPatch = async (table, ids, patch) => {
-      for (const id of ids) await this.patchT(table, id, patch);
+      // one PATCH for all ids (was one request per row)
+      const updated = await this.patchMany(table, ids, patch);
+      if (Array.isArray(updated) && updated.length !== ids.length) {
+        throw new Error('Reset patch matched ' + updated.length + '/' + ids.length + ' rows in ' + table);
+      }
       if (ids.length) counts[table + '_reset'] = ids.length;
     };
 
@@ -340,17 +365,15 @@ const API = {
         }
       }
     } else if (type === 'progress') {
-      for (const tb of ['tasks', 'archive', 'focus_sessions', 'habit_logs', 'daily_reviews', 'weekly_reviews']) {
-        await del(SB_TABLES[tb] || tb, '?id=not.is.null');
-      }
+      // independent wipes — one request per table, but all six in parallel
+      await Promise.all(['tasks', 'archive', 'focus_sessions', 'habit_logs', 'daily_reviews', 'weekly_reviews']
+        .map(tb => del(SB_TABLES[tb] || tb, '?id=not.is.null')));
       const habits = ((window.App && App.state && App.state.habits) || []);
       await countPatch('habits', habits.map(h => h.id), { current_streak: '0', best_streak: '0' });
     } else if (type === 'everything') {
       // settings has no `id` column (its key is `key`), so it is wiped last and
       // separately — `?id=...` there fails with 42703 and aborts the whole reset.
-      for (const t of Object.values(SB_TABLES)) {
-        await del(t, '?id=not.is.null');
-      }
+      await Promise.all(Object.values(SB_TABLES).map(t => del(t, '?id=not.is.null')));
       await del('settings', '?key=not.is.null');
     } else {
       throw new Error('Unknown reset type: ' + type + ' (use today | week | progress | everything)');
@@ -385,21 +408,21 @@ const API = {
 
   /** delete task + unlink its focus sessions (mirrors the GAS behaviour). */
   async deleteTaskFull(id) {
-    for (const s of ((window.App && App.state && App.state.focusSessions) || [])) {
-      if (String(s.task_id) === String(id)) await this.patch('focus_sessions', s.id, { task_id: '' });
-    }
+    const linked = (((window.App && App.state && App.state.focusSessions) || []))
+      .filter(s => String(s.task_id) === String(id));
+    await this.patchMany('focus_sessions', linked.map(s => s.id), { task_id: '' });
     await this.rest('archive', { method: 'DELETE', qs: '?id=eq.' + encodeURIComponent(id) });
     return this.remove('tasks', id);
   },
 
   /** delete goal + unlink tasks/sub-goals. */
   async deleteLinkedGoal(id) {
-    for (const t of ((window.App && App.state && App.state.tasks) || [])) {
-      if (String(t.goal_id) === String(id)) await this.patchT('tasks', t.id, { goal_id: '' });
-    }
-    for (const g of ((window.App && App.state && App.state.goals) || [])) {
-      if (String(g.parent_goal_id) === String(id)) await this.patchT('goals', g.id, { parent_goal_id: '' });
-    }
+    const linkedTasks = (((window.App && App.state && App.state.tasks) || []))
+      .filter(t => String(t.goal_id) === String(id));
+    const linkedGoals = (((window.App && App.state && App.state.goals) || []))
+      .filter(g => String(g.parent_goal_id) === String(id));
+    await this.patchMany('tasks', linkedTasks.map(t => t.id), { goal_id: '' });
+    await this.patchMany('goals', linkedGoals.map(g => g.id), { parent_goal_id: '' });
     return this.remove('goals', id);
   }
 };
