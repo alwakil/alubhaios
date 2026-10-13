@@ -57,6 +57,12 @@ const Analytics = {
     const completedOfPlanned = doneToday.length;
     // "missed" = was scheduled on a PAST day and is still not done today
     const tasksMissed = scheduledToday.filter(t => t.status !== 'completed' && date < Utils.today()).length;
+    // "late finish" history = was scheduled for this day but got finished AFTER it
+    // (kept visible so finishing late doesn't retroactively erase the day)
+    const tasksLateFinished = scheduledToday.filter(t => {
+      const done = this.taskCompletedDate(t);
+      return t.status === 'completed' && done && done > date;
+    }).length;
 
     let focusMin = 0, distrMin = 0, actualMin = 0;
     (App.state.focusSessions || []).forEach(s => {
@@ -92,6 +98,7 @@ const Analytics = {
       tasksCompletedAt: doneToday.length,
       tasksRemaining: Math.max(0, plannedCount - completedOfPlanned),
       tasksMissed: tasksMissed,
+      tasksLateFinished: tasksLateFinished,
       focusMinutes: focusMin,
       distractionMinutes: distrMin,
       habitDone: habitDone,
@@ -755,7 +762,7 @@ const AnalyticsPage = {
     const wrap = qs('#missed-chart', App.container());
     if (!wrap) return;
     const daily = Analytics.dailyStats(14).slice(-14);
-    const hasAny = daily.some(d => d.tasksCompletedAt > 0 || d.tasksMissed > 0);
+    const hasAny = daily.some(d => d.tasksCompletedAt > 0 || d.tasksMissed > 0 || d.tasksLateFinished > 0);
     if (!hasAny) {
       wrap.appendChild(el(emptyState('calendar-xmark', 'Completed vs missed tasks',
         'Schedule tasks with a date — completed and missed days appear here.')));
@@ -763,7 +770,7 @@ const AnalyticsPage = {
     }
     wrap.innerHTML = `
       <h3 class="card-title">${icon('calendar-xmark')} Completed vs missed tasks — last 14 days</h3>
-      <p class="muted small">Missed = was scheduled that day but is still pending today. Today's open tasks are not counted yet.</p>
+      <p class="muted small">Missed = was scheduled that day and is still pending today. Amber = the work was finished, but after its scheduled day. Completed = finished that day.</p>
       <div class="chart-box"><canvas id="missed-canvas"></canvas></div>`;
     Charts.make('missed-canvas', {
       type: 'bar',
@@ -771,6 +778,7 @@ const AnalyticsPage = {
         labels: daily.map(d => d.date.slice(5)),
         datasets: [
           { label: 'Completed', data: daily.map(d => d.tasksCompletedAt), backgroundColor: '#10b981', borderRadius: 3, stack: 's' },
+          { label: 'Late finish', data: daily.map(d => d.tasksLateFinished || 0), backgroundColor: '#f59e0b', borderRadius: 3, stack: 's' },
           { label: 'Missed', data: daily.map(d => d.tasksMissed), backgroundColor: '#ef4444', borderRadius: 3, stack: 's' }
         ]
       },

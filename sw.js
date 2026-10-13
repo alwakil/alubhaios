@@ -7,7 +7,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'alubhaios-v2.10.4';
+const CACHE = 'alubhaios-v2.10.5';
 /* everything index.html references + the fonts its vendor CSS pulls in —
    offline must open the full app, not a blank screen */
 const CORE = [
@@ -90,8 +90,8 @@ self.addEventListener('fetch', event => {
   }
 
   // everything else: cache first, then network (and keep a copy).
-  // ignoreSearch so a stale ?v=2.10.4 URL still serves the freshly cached
-  // ?v=2.10.4 asset instead of refetching from the network.
+  // ignoreSearch so a stale ?v=2.10.5 URL still serves the freshly cached
+  // ?v=2.10.5 asset instead of refetching from the network.
   event.respondWith(
     caches.match(req, { ignoreSearch: true }).then(hit => hit ||
       fetch(req).then(res => {
