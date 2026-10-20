@@ -680,9 +680,9 @@ const Focus = {
               <label class="field"><span>Break minutes</span>
                 <input type="number" id="pomo-break-min" min="1" max="60" step="1" value="${Utils.esc(Utils.pref('pomoBreakMin') || 5)}"></label>
             </div>
-            <label class="field" id="pomo-category-field"><span>Category</span><select id="pomo-category">${categoryOptions}</select></label>
             <label class="field"><span>Task</span><select id="pomo-task">${taskOptions}</select></label>
             <p class="focus-task-info" id="pomo-task-info" hidden></p>
+            <label class="field" id="pomo-category-field"><span>Category</span><select id="pomo-category">${categoryOptions}</select></label>
             <label class="field" id="pomo-goal-field"><span>Goal</span><select id="pomo-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
             <div class="focus-controls">
               <button class="btn btn-primary btn-lg" data-pomo="start">${icon('play')} Start pomodoro</button>
@@ -743,12 +743,12 @@ const Focus = {
     ` : `
       <div class="focus-setup">
         <h3 class="card-title">${icon('stopwatch')} Start a focus session</h3>
+        <label class="field"><span>Task</span><select id="focus-task">${taskOptions}</select></label>
+        <p class="focus-task-info" id="focus-task-info" hidden></p>
         <div class="field-row">
           <label class="field"><span>Mode</span><select id="focus-mode">${modeOptions}</select></label>
           <label class="field" id="focus-category-field"><span>Category</span><select id="focus-category">${categoryOptions}</select></label>
         </div>
-        <label class="field"><span>Task</span><select id="focus-task">${taskOptions}</select></label>
-        <p class="focus-task-info" id="focus-task-info" hidden></p>
         <label class="field" id="focus-goal-field"><span>Goal</span><select id="focus-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
         <div class="focus-controls">
           <button class="btn btn-primary btn-lg" data-focus="start">${icon('play')} Start</button>
