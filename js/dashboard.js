@@ -10,7 +10,7 @@ const Dashboard = {
     const t = Analytics.todayStats();
     const name = App.settings.user_name || '';
     const hour = new Date().getHours();
-    const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const greet = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const streaks = (App.state.habits || []).filter(h => h.enabled !== false)
       .map(h => Analytics.habitStreaks(h.id).current);
     const bestStreak = streaks.length ? Math.max.apply(null, streaks) : 0;

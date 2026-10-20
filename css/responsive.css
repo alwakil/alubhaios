@@ -18,7 +18,7 @@
   .dash-grid { grid-template-columns: 1fr; }
   .chart-row { grid-template-columns: 1fr 1fr; }
   .filter-bar { grid-template-columns: 1fr 1fr 1fr; }
-  .settings-grid { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- Phones ---------- */

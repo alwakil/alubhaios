@@ -529,7 +529,9 @@ const Analytics = {
 
     const best = this.bestWeekday(28);
     if (best) {
-      out.push({ icon: 'calendar-week', tone: 'info', text: `You tend to complete more tasks on ${best.weekday}days.` });
+      // weekdayShort → long name ("Sat" must read "Saturdays", not "Satdays")
+      const LONG_DAYS = { Sun: 'Sundays', Mon: 'Mondays', Tue: 'Tuesdays', Wed: 'Wednesdays', Thu: 'Thursdays', Fri: 'Fridays', Sat: 'Saturdays' };
+      out.push({ icon: 'calendar-week', tone: 'info', text: `You tend to complete more tasks on ${LONG_DAYS[best.weekday] || best.weekday + 'days'}.` });
     }
 
     const bt = this.bestTime();
