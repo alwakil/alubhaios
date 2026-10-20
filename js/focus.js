@@ -551,7 +551,16 @@ const Focus = {
       const btn = e.target.closest('[data-focus]');
       if (btn) {
         const act = btn.dataset.focus;
-        if (act === 'start') this.start(qs('#focus-mode', container).value, qs('#focus-category', container).value, qs('#focus-task', container).value, qs('#focus-goal', container).value);
+        if (act === 'start') {
+          // a picked task supplies its own category + goal — the (hidden) dropdowns are only a fallback
+          const st = (App.state.tasks || []).find(x => x.id === qs('#focus-task', container).value);
+          this.start(
+            qs('#focus-mode', container).value,
+            (st && st.category) || qs('#focus-category', container).value,
+            qs('#focus-task', container).value,
+            (st && st.goal_id) || qs('#focus-goal', container).value
+          );
+        }
         if (act === 'pause') this.pause();
         if (act === 'resume') this.resume();
         if (act === 'stop') this.stop();
@@ -579,6 +588,31 @@ const Focus = {
     const sorted = goals.slice().sort((a, b) => rank(a) - rank(b) || String(a.title).localeCompare(String(b.title)));
     return '<option value="">🎯 no specific goal</option>' + sorted.map(g =>
       `<option value="${g.id}" ${selectedId === g.id ? 'selected' : ''}>${g.status === 'active' ? '' : '[' + (g.status || 'active') + '] '}${Utils.esc(g.title)}</option>`).join('');
+  },
+
+  /** A task already knows its category + goal — hide those dropdowns and
+      show a read-only line instead. The dropdowns only come back for
+      "no specific task" (or a task without a goal, so one can be attached). */
+  _applyTaskSetup(prefix, panel) {
+    const sel = qs('#' + prefix + '-task', panel);
+    const info = qs('#' + prefix + '-task-info', panel);
+    const catField = qs('#' + prefix + '-category-field', panel);
+    const goalField = qs('#' + prefix + '-goal-field', panel);
+    if (!sel || !info || !catField || !goalField) return;
+    const t = (App.state.tasks || []).find(x => x.id === sel.value);
+    if (t && t.category) {
+      const goal = t.goal_id ? (App.state.goals || []).find(g => g.id === t.goal_id) : null;
+      info.innerHTML = `${icon('folder')} ${Utils.esc(t.category)}` +
+        (goal ? ` &nbsp;·&nbsp; ${icon('bullseye')} ${Utils.esc(goal.title)}` : '') +
+        ' <span class="muted small">(from the task)</span>';
+      info.hidden = false;
+      catField.hidden = true;
+      goalField.hidden = !!t.goal_id;
+    } else {
+      info.hidden = true;
+      catField.hidden = false;
+      goalField.hidden = false;
+    }
   },
 
   renderPanel() {
@@ -646,9 +680,10 @@ const Focus = {
               <label class="field"><span>Break minutes</span>
                 <input type="number" id="pomo-break-min" min="1" max="60" step="1" value="${Utils.esc(Utils.pref('pomoBreakMin') || 5)}"></label>
             </div>
-            <label class="field"><span>Category</span><select id="pomo-category">${categoryOptions}</select></label>
+            <label class="field" id="pomo-category-field"><span>Category</span><select id="pomo-category">${categoryOptions}</select></label>
             <label class="field"><span>Task</span><select id="pomo-task">${taskOptions}</select></label>
-            <label class="field"><span>Goal</span><select id="pomo-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
+            <p class="focus-task-info" id="pomo-task-info" hidden></p>
+            <label class="field" id="pomo-goal-field"><span>Goal</span><select id="pomo-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
             <div class="focus-controls">
               <button class="btn btn-primary btn-lg" data-pomo="start">${icon('play')} Start pomodoro</button>
             </div>
@@ -660,6 +695,7 @@ const Focus = {
         const presetTaskAtRender = this.presetTask;
         if (sel) {
           if (presetTaskAtRender) sel.value = presetTaskAtRender;
+          else if (this.presetGoal) sel.value = ''; // goal-only start (Goals ⏱) must not be hijacked by the auto-picked task
           else {
             const firstToday = qsa('option[data-today]', sel)[0];
             if (firstToday) sel.value = firstToday.value;
@@ -676,6 +712,10 @@ const Focus = {
         }
         this.presetTask = null;
         this.presetGoal = null;
+        if (sel) {
+          if (typeof sel.addEventListener === 'function') sel.addEventListener('change', () => this._applyTaskSetup('pomo', panel));
+          this._applyTaskSetup('pomo', panel);
+        }
       }
       return;
     }
@@ -705,10 +745,11 @@ const Focus = {
         <h3 class="card-title">${icon('stopwatch')} Start a focus session</h3>
         <div class="field-row">
           <label class="field"><span>Mode</span><select id="focus-mode">${modeOptions}</select></label>
-          <label class="field"><span>Category</span><select id="focus-category">${categoryOptions}</select></label>
+          <label class="field" id="focus-category-field"><span>Category</span><select id="focus-category">${categoryOptions}</select></label>
         </div>
         <label class="field"><span>Task</span><select id="focus-task">${taskOptions}</select></label>
-        <label class="field"><span>Goal</span><select id="focus-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
+        <p class="focus-task-info" id="focus-task-info" hidden></p>
+        <label class="field" id="focus-goal-field"><span>Goal</span><select id="focus-goal">${this.goalOptionsHtml(this.presetGoal)}</select></label>
         <div class="focus-controls">
           <button class="btn btn-primary btn-lg" data-focus="start">${icon('play')} Start</button>
         </div>
@@ -720,6 +761,7 @@ const Focus = {
       const presetTaskAtRender = this.presetTask;
       if (sel) {
         if (presetTaskAtRender) sel.value = presetTaskAtRender;
+        else if (this.presetGoal) sel.value = ''; // goal-only start (Goals ⏱) must not be hijacked by the auto-picked task
         else {
           const firstToday = qsa('option[data-today]', sel)[0];
           if (firstToday) sel.value = firstToday.value;
@@ -735,6 +777,10 @@ const Focus = {
       }
       this.presetTask = null;
       this.presetGoal = null;
+      if (sel) {
+        if (typeof sel.addEventListener === 'function') sel.addEventListener('change', () => this._applyTaskSetup('focus', panel));
+        this._applyTaskSetup('focus', panel);
+      }
     } else {
       const mode = (CONFIG.FOCUS_MODES || []).find(m => m.name === this.timer.mode);
       const suggested = (mode && mode.suggested_minutes) || 45;
@@ -748,12 +794,14 @@ const Focus = {
     if (act === 'start') {
       Utils.pref('pomoFocusMin', Utils.clamp(Utils.num(qs('#pomo-focus-min', container).value) || 25, 5, 180));
       Utils.pref('pomoBreakMin', Utils.clamp(Utils.num(qs('#pomo-break-min', container).value) || 5, 1, 60));
+      // a picked task supplies its own category + goal — the (hidden) dropdowns are only a fallback
+      const pt = (App.state.tasks || []).find(x => x.id === qs('#pomo-task', container).value);
       this.startPomo(
         Utils.num(qs('#pomo-focus-min', container).value) || 25,
         Utils.num(qs('#pomo-break-min', container).value) || 5,
         qs('#pomo-task', container).value,
-        qs('#pomo-category', container).value,
-        qs('#pomo-goal', container).value
+        (pt && pt.category) || qs('#pomo-category', container).value,
+        (pt && pt.goal_id) || qs('#pomo-goal', container).value
       );
     }
     if (act === 'pause') this.pomoPause();

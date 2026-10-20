@@ -1184,3 +1184,15 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
+
+/* ============ v2.10.6 — a picked task supplies its category + goal ============ */
+
+/* read-only line that replaces the Category/Goal dropdowns when a task is picked */
+.focus-task-info {
+  margin: 2px 0 12px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+.focus-task-info i { color: var(--c-primary); margin-right: 2px; }
