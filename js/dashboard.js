@@ -94,6 +94,7 @@ const Dashboard = {
         <a class="link" href="#/today">Open today ${icon('arrow-right', 'fa-xs')}</a>
       </div>
       <div class="card" id="dash-priorities"></div>
+      <div class="card dash-upcoming" id="dash-upcoming" hidden></div>
 
       <div class="quick-actions">
         <button class="btn btn-primary" data-qa="task">${icon('plus')} New task</button>
@@ -119,6 +120,21 @@ const Dashboard = {
           </li>`).join('')}</ol>`
       : emptyState('mug-hot', 'Nothing planned yet', 'Add a task for today to build your morning plan.',
           `<button class="btn btn-primary" data-qa="task">${icon('plus')} Create task</button>`);
+
+    // 📅 upcoming — open tasks scheduled in the next 3 days (Today/home only
+    // show today's tasks, so soon-due work would otherwise be invisible here)
+    const upcoming = Analytics.upcomingTasks(3);
+    if (upcoming.length) {
+      const upCard = qs('#dash-upcoming', container);
+      upCard.hidden = false;
+      upCard.innerHTML = `<div class="section-subhead">${icon('calendar-days')} Upcoming — next 3 days</div>` +
+        upcoming.map(g => `
+          <div class="upcoming-row">
+            ${chip(Utils.fmtDay(g.date), '#6366f1')}
+            <span class="upcoming-titles">${g.tasks.map(t => Utils.esc(t.title)).join(' · ')}</span>
+          </div>`).join('') +
+        `<a class="link small" href="#/tasks">Open tasks ${icon('arrow-right', 'fa-xs')}</a>`;
+    }
 
     // score ring
     const track = Charts.cssVar('--chart-grid') || 'rgba(150,160,180,.2)';
@@ -267,6 +283,8 @@ const Dashboard = {
       </div>
       <div id="today-tasks" class="stack"></div>
 
+      <div class="card dash-upcoming" id="today-upcoming" hidden></div>
+
       <div class="section-head"><h3>Habits — quick check</h3><a class="link" href="#/habits">Manage ${icon('arrow-right', 'fa-xs')}</a></div>
       <div class="habit-quick" id="today-habits"></div>
 
@@ -348,6 +366,20 @@ const Dashboard = {
       wrap.innerHTML = '';
       wrap.appendChild(el(emptyState('list-check', 'No tasks for today', 'Plan your day by adding the first task.',
         `<button class="btn btn-primary" data-qa="task">${icon('plus')} Add task</button>`)));
+    }
+
+    // 📅 upcoming (same rule as dashboard — next 3 days, open tasks only)
+    const upcoming = Analytics.upcomingTasks(3);
+    if (upcoming.length) {
+      const upCard = qs('#today-upcoming', container);
+      upCard.hidden = false;
+      upCard.innerHTML = `<div class="section-subhead">${icon('calendar-days')} Upcoming — next 3 days</div>` +
+        upcoming.map(g => `
+          <div class="upcoming-row">
+            ${chip(Utils.fmtDay(g.date), '#6366f1')}
+            <span class="upcoming-titles">${g.tasks.map(t => Utils.esc(t.title)).join(' · ')}</span>
+          </div>`).join('') +
+        `<a class="link small" href="#/tasks">Open tasks ${icon('arrow-right', 'fa-xs')}</a>`;
     }
 
     // habit quick toggles

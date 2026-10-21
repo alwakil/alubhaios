@@ -188,6 +188,31 @@ const Analytics = {
     return s[s.length - 1];
   },
 
+  /** 📅 open tasks scheduled in the NEXT `nDays` days (tomorrow … today+nDays),
+      grouped by date, dates oldest first, tasks within a day by priority.
+      Excludes today itself, past days (those are "missed"), completed and
+      archived tasks. The Today page / dashboard only show today's tasks, so
+      this is what makes soon-due work visible. Pure. */
+  upcomingTasks(nDays) {
+    const n = Utils.num(nDays) || 3;
+    const today = Utils.today();
+    const last = Utils.addDays(today, n);
+    const byDate = {};
+    (App.state.tasks || []).forEach(t => {
+      if (t._archived || t.status === 'completed') return;
+      const d = String(t.scheduled_date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d <= today || d > last) return;
+      (byDate[d] = byDate[d] || []).push(t);
+    });
+    const rank = { high: 0, medium: 1, low: 2 };
+    return Object.keys(byDate).sort().map(date => ({
+      date: date,
+      tasks: byDate[date].sort((a, b) =>
+        ((rank[a.priority] !== undefined ? rank[a.priority] : 1) - (rank[b.priority] !== undefined ? rank[b.priority] : 1)) ||
+        String(a.created_at || '').localeCompare(String(b.created_at || '')))
+    }));
+  },
+
   /** Monday-based weekly aggregates, last `weeks` weeks including the current one. */
   weeklyStats(weeks) {
     const daily = this.dailyStats(weeks * 7 + 7);

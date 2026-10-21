@@ -142,3 +142,24 @@
 }
 
 .week-nav > div { text-align: center; }
+
+/* ---------------- Upcoming (next 3 days) ---------------- */
+
+.dash-upcoming { margin-top: 12px; }
+.dash-upcoming .section-subhead { margin-bottom: 6px; }
+.upcoming-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 13.5px;
+}
+.upcoming-titles {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-main, inherit);
+}
+.dash-upcoming .link.small { display: inline-block; margin-top: 6px; font-size: 12.5px; }
