@@ -66,6 +66,7 @@ const Goals = {
         <h3 class="card-title">${icon('stopwatch')} Focus time by goal — last ${this.range} days</h3>
         <div class="chart-box"><canvas id="goal-focus-chart"></canvas></div>
       </div>
+      <div class="card" id="money-card"></div>
       <div id="goal-list" class="stack"></div>
     `;
     container.onclick = e => {
@@ -91,7 +92,77 @@ const Goals = {
       }
     };
     this.renderFocusChart();
+    this.renderMoney();
     this.renderList();
+  },
+
+  /* ================= 💰 money log =================
+     Entries live in the `money_log` settings key (JSON array of
+     {id, date, type:'in'|'out', amt, note}) — no extra table needed.
+     Net = income − expense. Paired with a matching goal it becomes
+     a daily habit toward that number. */
+  renderMoney() {
+    const card = qs('#money-card', App.container());
+    if (!card) return;
+    const sum = Analytics.moneySummary();
+    const moneyGoal = (App.state.goals || []).find(g => g.status !== 'completed' && /50\s*k|money|savings/i.test(String(g.title || '')));
+    const target = 50000; // ৳50K by default; progress shows when a money-goal exists
+    card.innerHTML = `
+      <h3 class="card-title">${icon('sack-dollar')} Money log ${moneyGoal ? `— <span class="muted">${Utils.esc(moneyGoal.title)}</span>` : ''}</h3>
+      <div class="money-stats">
+        <div><b>৳${sum.totalNet.toLocaleString('en-IN')}</b><span>total saved</span></div>
+        <div><b>৳${sum.monthNet.toLocaleString('en-IN')}</b><span>this month</span></div>
+        <div><b>৳${sum.todayNet.toLocaleString('en-IN')}</b><span>today</span></div>
+        <div><b>${sum.streakDays}d</b><span>logging streak</span></div>
+        ${moneyGoal ? `<div><b>${Utils.clamp(Math.round(sum.totalNet / target * 100), -99, 100)}%</b><span>of ৳50,000</span></div>` : ''}
+      </div>
+      ${sum.count && sum.staleDays >= 3 ? `<p class="muted small money-nag" style="margin:6px 0 0">😈 Phonu notices the silence — ${sum.staleDays} days without a money entry…</p>` : ''}
+      <div class="money-add">
+        <input type="number" id="money-amt" min="1" placeholder="Amount ৳" style="max-width:120px">
+        <select id="money-type"><option value="in">＋ saved / income</option><option value="out">− spent</option></select>
+        <input id="money-note" placeholder="Note (optional)" maxlength="60">
+        <button class="btn btn-primary btn-sm" id="money-add-btn">${icon('plus')} Add</button>
+      </div>
+      <div class="money-list">
+        ${sum.entries.slice(0, 10).map(e => `
+          <div class="money-row" data-id="${Utils.esc(e.id)}">
+            <span class="money-date muted small">${Utils.fmtDate(String(e.date).slice(0, 10))}</span>
+            <span class="money-note-txt">${Utils.esc(e.note || (e.type === 'in' ? 'Saved' : 'Spent'))}</span>
+            <b class="${e.type === 'out' ? 'money-out' : 'money-in'}">${e.type === 'out' ? '−' : '+'}৳${Utils.num(e.amt).toLocaleString('en-IN')}</b>
+            <button class="btn btn-icon btn-ghost danger" data-money-del="${Utils.esc(e.id)}" title="Delete entry">${icon('xmark')}</button>
+          </div>`).join('')}
+        ${sum.count ? '' : '<p class="muted small">No entries yet — add today\'s first one, it takes 10 seconds.</p>'}
+      </div>`;
+
+    /* wiring inside the (per-visit) card — no container-level stacking */
+    const saveLog = async arr => {
+      const val = JSON.stringify(arr);
+      await API.saveSettings({ money_log: val });
+      App.settings.money_log = val;
+      this.renderMoney();
+    };
+    qs('#money-add-btn', card).addEventListener('click', async () => {
+      const amt = Utils.num(qs('#money-amt', card).value);
+      const type = qs('#money-type', card).value;
+      const note = qs('#money-note', card).value.trim().slice(0, 60);
+      if (amt <= 0) return toast('Enter an amount first.', 'warn');
+      const arr = (() => { try { const a = JSON.parse(App.settings.money_log || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } })();
+      arr.push({ id: Utils.uid(), date: Utils.today(), type: type, amt: amt, note: note });
+      try {
+        await saveLog(arr);
+        toast(type === 'in' ? `💰 ৳${amt} saved — keep stacking!` : `🧾 ৳${amt} logged as spent.`, 'success');
+      } catch (e) { App.handleError(e); }
+    });
+    card.addEventListener('click', e => {
+      const del = e.target.closest('[data-money-del]');
+      if (!del) return;
+      const id = del.dataset.moneyDel;
+      const arr = (() => { try { const a = JSON.parse(App.settings.money_log || '[]'); return Array.isArray(a) ? a : []; } catch (err) { return []; } })()
+        .filter(x => x.id !== id);
+      API.saveSettings({ money_log: JSON.stringify(arr) })
+        .then(() => { App.settings.money_log = JSON.stringify(arr); this.renderMoney(); toast('Entry removed.', 'info'); })
+        .catch(err => App.handleError(err));
+    });
   },
 
   /** 📊 horizontal bars: focus minutes per goal for the selected window. */

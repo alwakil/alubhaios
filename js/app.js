@@ -149,6 +149,13 @@ const App = {
         this.hideSetupBanner();
         this.updateUpgradeBanner();
         this.notifyMissed();
+        // 📅 deadline feature probe: does the tasks table have a due_date column?
+        // (migration backend/0001-due-date.sql). Until it exists the form hides
+        // the field and the dashboard strip stays off — nothing breaks.
+        this.dueDateSupported = undefined;
+        API.rest('tasks', { method: 'GET', qs: '?select=id&due_date=not.is.null&limit=1' })
+          .then(() => { this.dueDateSupported = true; if (this.current === 'tasks') this.refreshCurrent(); })
+          .catch(() => { this.dueDateSupported = false; if (this.current === 'tasks' || this.current === 'settings') this.refreshCurrent(); });
         // auto day tasks from routines (idempotent — once per routine per date)
         if (typeof Routines !== 'undefined' && Routines.ensureTodayTasks) Routines.ensureTodayTasks().catch(() => {});
       }

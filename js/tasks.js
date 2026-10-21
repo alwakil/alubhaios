@@ -482,6 +482,14 @@ const Tasks = {
             ${chip(t.priority || 'medium', Utils.priorityColor(t.priority))}
             ${t.status !== 'pending' ? chip(t.status, t.status === 'completed' ? '#10b981' : '#f59e0b') : ''}
             ${t.scheduled_date ? chip(overdue ? 'overdue' : Utils.fmtDate(t.scheduled_date), overdue ? '#ef4444' : '#64748b') : ''}
+            ${(() => {
+              const d = String(t.due_date || '').slice(0, 10);
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || t.status === 'completed') return '';
+              const left = Math.round((Utils.parseDate(d) - Utils.parseDate(Utils.today())) / 86400000);
+              if (left < 0) return chip('⏰ ' + Math.abs(left) + 'd OVERDUE', '#ef4444');
+              if (left <= 2) return chip('⏰ due in ' + left + 'd', left === 0 ? '#ef4444' : '#f59e0b');
+              return chip('⏰ due ' + Utils.fmtDate(d), '#64748b');
+            })()}
             ${t.estimated_minutes ? chip('est ' + Utils.fmtMinutes(t.estimated_minutes), '#64748b') : ''}
             ${t.actual_minutes ? chip('actual ' + Utils.fmtMinutes(t.actual_minutes), '#10b981') : ''}
             ${(() => {
@@ -580,6 +588,13 @@ const Tasks = {
             <label class="field"><span>Scheduled date</span>
               <input type="date" name="scheduled_date" value="${Utils.esc(t.scheduled_date || Utils.today())}"></label>
           </div>
+          ${App.dueDateSupported === false ? '' : `
+          <div class="field-row">
+            <label class="field"><span>Deadline (hard due by)</span>
+              <input type="date" name="due_date" value="${Utils.esc(t.due_date || '')}"></label>
+            <label class="field"><span>&nbsp;</span>
+              <span class="muted small">Optional — for exams/tests that CANNOT move. Shown on the dashboard countdown; different from the day you plan to work on it.</span></label>
+          </div>`}
           <div class="field-row">
             <label class="field"><span>Estimated minutes</span>
               <input type="number" min="0" step="5" name="estimated_minutes" value="${Utils.esc(t.estimated_minutes || '')}" placeholder="e.g. 90"></label>
@@ -617,6 +632,9 @@ const Tasks = {
         goal_id: fd.get('goal_id'),
         project_id: fd.get('project_id').trim()
       };
+      // due_date only travels when set (and only when the column exists) —
+      // older schemas without the column would reject the row (PGRST204)
+      if (App.dueDateSupported !== false && fd.get('due_date')) data.due_date = fd.get('due_date');
       if (data.status === 'completed' && !t.completed_at) data.completed_at = Utils.nowISO();
       if (data.status !== 'completed') data.completed_at = t.completed_at && data.status === 'completed' ? t.completed_at : '';
 

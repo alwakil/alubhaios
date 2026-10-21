@@ -54,6 +54,30 @@ const Gamify = {
 
   PENALTIES: { task: 5, habit: 2, salah: 2, perDayCap: 15 },
 
+  /** 🎓 grace periods (exam mode / travel / life happens) — stored in the
+      `grace_days` settings key as a JSON array of {from, to, reason, added}.
+      On a grace day the missed-work penalty does NOT count (XP stays intact);
+      history and the missed alert are untouched. */
+  graceRanges() {
+    let arr = [];
+    try { arr = JSON.parse(App.settings.grace_days || '[]'); } catch (e) { arr = []; }
+    return (Array.isArray(arr) ? arr : [])
+      .filter(g => /^\d{4}-\d{2}-\d{2}$/.test(String(g.from || '').slice(0, 10)) && /^\d{4}-\d{2}-\d{2}$/.test(String(g.to || '').slice(0, 10)))
+      .map(g => ({ from: String(g.from).slice(0, 10), to: String(g.to).slice(0, 10), reason: String(g.reason || 'Grace').slice(0, 60), added: String(g.added || '') }));
+  },
+
+  /** is `date` inside any grace range? */
+  inGrace(date) {
+    const d = String(date || '').slice(0, 10);
+    return this.graceRanges().some(g => d >= g.from && d <= g.to);
+  },
+
+  /** the range that covers TODAY (dashboard note), or null. */
+  activeGrace() {
+    const today = Utils.today();
+    return this.graceRanges().find(g => today >= g.from && today <= g.to) || null;
+  },
+
   /** First day the penalty system is active (set once, stored in Settings). */
   penaltySince() {
     let since = String(App.settings.penalty_since || '').slice(0, 10);
@@ -86,6 +110,8 @@ const Gamify = {
 
     dates.forEach(date => {
       let dayPenalty = 0;
+      // 🎓 grace day (exam mode etc.): no penalty counting at all
+      if (this.inGrace(date)) return;
       // missed tasks: scheduled that past day, still not completed
       const missedTasks = (App.state.tasks || []).filter(t =>
         !t._archived && t.status !== 'completed' && String(t.scheduled_date || '').slice(0, 10) === date).length;

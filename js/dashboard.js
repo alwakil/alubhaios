@@ -42,8 +42,10 @@ const Dashboard = {
           ${(() => {
             const lv = Gamify.level(Gamify.xp());
             const p = Gamify.penalty();
-            const pen = p.total ? `<div class="penalty-mini">−${p.total} XP missed-work penalty <a href="#/badges">details</a></div>` : '';
-            return pen + `<a class="level-mini" href="#/badges" title="Open Badges">
+            const grace = (typeof Gamify.activeGrace === 'function') ? Gamify.activeGrace() : null;
+            const pen = (!grace && p.total) ? `<div class="penalty-mini">−${p.total} XP missed-work penalty <a href="#/badges">details</a></div>` : '';
+            const graceNote = grace ? `<div class="grace-note">🎓 ${Utils.esc(grace.reason)} mode — penalties paused until ${Utils.fmtDate(grace.to)}</div>` : '';
+            return graceNote + pen + `<a class="level-mini" href="#/badges" title="Open Badges">
               <span class="level-badge">Lv ${lv.level}</span>
               <div class="level-mini-bar"><div class="progress-fill" style="width:${lv.pct}%"></div></div>
               <span class="muted small">${lv.into}/${lv.need} XP</span>
@@ -95,6 +97,7 @@ const Dashboard = {
       </div>
       <div class="card" id="dash-priorities"></div>
       <div class="card dash-upcoming" id="dash-upcoming" hidden></div>
+      <div class="card dash-upcoming" id="dash-deadlines" hidden></div>
 
       <div class="quick-actions">
         <button class="btn btn-primary" data-qa="task">${icon('plus')} New task</button>
@@ -134,6 +137,24 @@ const Dashboard = {
             <span class="upcoming-titles">${g.tasks.map(t => Utils.esc(t.title)).join(' · ')}</span>
           </div>`).join('') +
         `<a class="link small" href="#/tasks">Open tasks ${icon('arrow-right', 'fa-xs')}</a>`;
+    }
+
+    // ⏰ hard deadlines (due_date) — exams/tests that cannot move
+    if (App.dueDateSupported === true) {
+      const dl = Analytics.deadlines(14);
+      if (dl.length) {
+        const dlCard = qs('#dash-deadlines', container);
+        dlCard.hidden = false;
+        dlCard.innerHTML = `<div class="section-subhead">${icon('hourglass-half')} Deadlines</div>` +
+          dl.slice(0, 5).map(d => `
+            <div class="upcoming-row">
+              ${chip(d.overdue ? Math.abs(d.daysLeft) + 'd OVERDUE' : d.daysLeft === 0 ? 'due TODAY' : 'in ' + d.daysLeft + 'd',
+                     d.overdue || d.daysLeft <= 1 ? '#ef4444' : d.daysLeft <= 3 ? '#f59e0b' : '#64748b')}
+              <span class="upcoming-titles">${Utils.esc(d.title)}</span>
+              <span class="muted small">${Utils.fmtDate(d.due)}</span>
+            </div>`).join('') +
+          `<a class="link small" href="#/tasks">Open tasks ${icon('arrow-right', 'fa-xs')}</a>`;
+      }
     }
 
     // score ring

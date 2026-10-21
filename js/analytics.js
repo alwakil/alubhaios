@@ -213,6 +213,99 @@ const Analytics = {
     }));
   },
 
+  /** ⏰ open tasks with a hard DEADLINE (due_date), sorted by due date.
+      Includes overdue ones (they're the loudest). daysLeft < 0 = overdue.
+      Pure — depends only on App.state.tasks + Utils. */
+  deadlines(daysAhead) {
+    const today = Utils.today();
+    const last = Utils.addDays(today, Utils.num(daysAhead) || 7);
+    return (App.state.tasks || [])
+      .filter(t => !t._archived && t.status !== 'completed' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(String(t.due_date || '').slice(0, 10)) && String(t.due_date).slice(0, 10) <= last)
+      .map(t => {
+        const due = String(t.due_date).slice(0, 10);
+        return {
+          id: t.id, title: t.title, due: due, priority: t.priority,
+          overdue: due < today,
+          daysLeft: Math.round((Utils.parseDate(due) - Utils.parseDate(today)) / 86400000)
+        };
+      })
+      .sort((a, b) => a.due.localeCompare(b.due) || String(a.title).localeCompare(String(b.title)));
+  },
+
+  /** 🧠 skill map for the Study page — solved CTF challenges + finished study
+      modules bucketed by category over the last `weeks` weeks, so strengths
+      and gaps are visible at a glance. Pure. */
+  skillMap(weeks) {
+    const W = Math.max(1, Utils.num(weeks) || 12);
+    const today = Utils.today();
+    const weeksArr = [];
+    for (let i = W - 1; i >= 0; i--) {
+      const end = Utils.addDays(today, -7 * i);
+      weeksArr.push({ end: end, start: Utils.addDays(end, -6) });
+    }
+    const solved = (App.state.challenges || []).filter(c => c.status === 'solved');
+    const buckets = {};
+    solved.forEach(c => {
+      const cat = String(c.category || 'Uncategorized').trim() || 'Uncategorized';
+      const row = buckets[cat] = buckets[cat] || { total: 0, weekly: new Array(W).fill(0), last: '' };
+      row.total++;
+      const d = String(c.solved_date || '').slice(0, 10);
+      if (d) {
+        row.last = row.last > d ? row.last : d;
+        const wk = weeksArr.find(w => d >= w.start && d <= w.end);
+        if (wk) row.weekly[weeksArr.indexOf(wk)]++;
+      }
+    });
+    const mods = App.state.studyModules || [];
+    const modsDone = mods.filter(m => m.status === 'completed').length;
+    const cats = Object.keys(buckets)
+      .map(cat => ({
+        category: cat,
+        total: buckets[cat].total,
+        weekly: buckets[cat].weekly,
+        last: buckets[cat].last,
+        recent: buckets[cat].weekly.slice(-4).reduce((a, b) => a + b, 0)
+      }))
+      .sort((a, b) => b.total - a.total || a.category.localeCompare(b.category));
+    return {
+      weeks: weeksArr.map(w => w.end),
+      cats: cats,
+      weakest: cats.length >= 2 ? cats[cats.length - 1] : null,
+      totalSolved: solved.length,
+      modules: { total: mods.length, done: modsDone, pct: mods.length ? Utils.pct(modsDone, mods.length) : 0 }
+    };
+  },
+
+  /** 💰 money log summary from the `money_log` settings key (JSON array of
+      {id, date, type:'in'|'out', amt, note}). Totals are net (in − out).
+      Pure — today injectable for tests via todayStr. */
+  moneySummary(todayStr) {
+    let entries = [];
+    try { entries = JSON.parse(App.settings.money_log || '[]'); } catch (e) { entries = []; }
+    if (!Array.isArray(entries)) entries = [];
+    entries = entries.filter(e => e && /^\d{4}-\d{2}-\d{2}$/.test(String(e.date || '').slice(0, 10)) && Utils.num(e.amt) > 0);
+    entries.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)));
+    const today = todayStr || Utils.today();
+    const month = today.slice(0, 7);
+    const net = list => list.reduce((a, e) => a + (e.type === 'out' ? -1 : 1) * Utils.num(e.amt), 0);
+    const dates = new Set(entries.map(e => String(e.date).slice(0, 10)));
+    let streak = 0;
+    const yest = Utils.addDays(today, -1);
+    let cursor = dates.has(today) ? today : (dates.has(yest) ? yest : ''); // grace: counting continues from yesterday
+    while (cursor && dates.has(cursor)) { streak++; cursor = Utils.addDays(cursor, -1); }
+    return {
+      entries: entries,
+      count: entries.length,
+      todayNet: net(entries.filter(e => String(e.date).slice(0, 10) === today)),
+      monthNet: net(entries.filter(e => String(e.date).slice(0, 7) === month)),
+      totalNet: net(entries),
+      streakDays: streak,
+      lastEntryDate: entries.length ? String(entries[0].date).slice(0, 10) : '',
+      staleDays: entries.length ? Math.round((Utils.parseDate(today) - Utils.parseDate(String(entries[0].date).slice(0, 10))) / 86400000) : null
+    };
+  },
+
   /** Monday-based weekly aggregates, last `weeks` weeks including the current one. */
   weeklyStats(weeks) {
     const daily = this.dailyStats(weeks * 7 + 7);

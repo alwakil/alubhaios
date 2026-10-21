@@ -89,6 +89,29 @@ const Settings = {
           <button class="btn" id="notif-enable">${icon('bell')} Enable notifications</button>
         </div>
 
+        <!-- Grace mode (exam mode) -->
+        <div class="card">
+          <h3 class="card-title">${icon('graduation-cap')} Grace mode</h3>
+          <p class="muted small">Exam / travel / sick days where missed-work penalties make no sense. On grace days the −XP penalty is paused; history and the missed alert stay untouched.</p>
+          <div id="grace-list"></div>
+          <div class="grace-add">
+            <input type="date" id="grace-from" title="From">
+            <input type="date" id="grace-to" title="To">
+            <input id="grace-reason" placeholder="Reason (e.g. Final exam)" maxlength="60">
+            <button class="btn btn-primary" id="grace-add-btn">${icon('plus')} Add</button>
+          </div>
+        </div>
+
+        <!-- Deadlines setup (only shown when the due_date column is missing) -->
+        ${App.dueDateSupported === false ? `
+        <div class="card">
+          <h3 class="card-title">${icon('hourglass-half')} Enable deadlines</h3>
+          <p class="muted small">One-time database step: add the <code>due_date</code> column to <code>tasks</code> + <code>archive</code>. Until then the Deadline field stays hidden and nothing breaks.</p>
+          <pre class="sql-paste">ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_date TEXT;
+ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
+          <p class="muted small">Paste into Supabase Dashboard → SQL Editor → Run, then reload this page.</p>
+        </div>` : ''}
+
         <!-- About -->
         <div class="card">
           <h3 class="card-title">${icon('circle-info')} About</h3>
@@ -272,6 +295,72 @@ const Settings = {
       const st = qs('#notif-status', container);
       if (st && 'Notification' in window) st.innerHTML = `Status: <b>${Notification.permission}</b> — routine reminders + pomodoro alerts.`;
     });
+
+    /* --- grace mode (exam mode) --- */
+    const renderGrace = () => {
+      const ranges = (typeof Gamify !== 'undefined' && Gamify.graceRanges) ? Gamify.graceRanges() : [];
+      const wrap = qs('#grace-list', container);
+      wrap.innerHTML = ranges.length
+        ? ranges.map((g, i) => `
+            <div class="grace-row">
+              <span>${icon('graduation-cap')} <b>${Utils.esc(g.reason)}</b>
+                <span class="muted small">${Utils.fmtDate(g.from)} → ${Utils.fmtDate(g.to)}</span></span>
+              <button class="btn btn-sm btn-ghost danger" data-grace-del="${i}" title="Remove">${icon('xmark')}</button>
+            </div>`).join('')
+        : '<p class="muted small">No grace days configured.</p>';
+    };
+    renderGrace();
+    qs('#grace-add-btn', container).addEventListener('click', async () => {
+      const from = qs('#grace-from', container).value;
+      const to = qs('#grace-to', container).value;
+      const reason = qs('#grace-reason', container).value.trim() || 'Grace';
+      if (!from || !to || to < from) return toast('Pick a valid From → To date range.', 'warn');
+      const arr = (typeof Gamify !== 'undefined' && Gamify.graceRanges) ? Gamify.graceRanges()
+        .map(g => ({ from: g.from, to: g.to, reason: g.reason, added: g.added })) : [];
+      arr.push({ from: from, to: to, reason: reason, added: Utils.nowISO() });
+      try {
+        await API.saveSettings({ grace_days: JSON.stringify(arr) });
+        App.settings.grace_days = JSON.stringify(arr);
+        qs('#grace-from', container).value = ''; qs('#grace-to', container).value = ''; qs('#grace-reason', container).value = '';
+        renderGrace();
+        toast('🎓 Grace mode saved — penalties paused for that range.', 'success');
+        App.refreshCurrent();
+      } catch (e) { App.handleError(e); }
+    });
+    // delete lives on the (per-visit) list wrapper, not on container — mounting
+    // on container would stack a listener on every Settings visit and double-fire
+    qs('#grace-list', container).addEventListener('click', e => {
+      const del = e.target.closest('[data-grace-del]');
+      if (!del) return;
+      const idx = Number(del.dataset.graceDel);
+      const arr = (typeof Gamify !== 'undefined' && Gamify.graceRanges) ? Gamify.graceRanges()
+        .map(g => ({ from: g.from, to: g.to, reason: g.reason, added: g.added })) : [];
+      arr.splice(idx, 1);
+      API.saveSettings({ grace_days: JSON.stringify(arr) })
+        .then(() => {
+          App.settings.grace_days = JSON.stringify(arr);
+          renderGrace();
+          toast('Grace range removed.', 'info');
+          App.refreshCurrent();
+        })
+        .catch(err => App.handleError(err));
+    });
+    container.addEventListener('click', e => {
+      const del = e.target.closest('[data-grace-del]');
+      if (!del) return;
+      const idx = Number(del.dataset.graceDel);
+      const arr = (typeof Gamify !== 'undefined' && Gamify.graceRanges) ? Gamify.graceRanges()
+        .map(g => ({ from: g.from, to: g.to, reason: g.reason, added: g.added })) : [];
+      arr.splice(idx, 1);
+      API.saveSettings({ grace_days: JSON.stringify(arr) })
+        .then(() => {
+          App.settings.grace_days = JSON.stringify(arr);
+          renderGrace();
+          toast('Grace range removed.', 'info');
+          App.refreshCurrent();
+        })
+        .catch(err => App.handleError(err));
+    }, { once: false });
 
     // PWA install hint
     const pwa = qs('#pwa-hint', container);

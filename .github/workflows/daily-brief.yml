@@ -1,0 +1,27 @@
+name: Daily Telegram brief
+
+# AluBhaiOS morning briefing — 06:30 Asia/Dhaka (00:30 UTC).
+# Setup once in repo Settings → Secrets and variables → Actions:
+#   SUPABASE_URL · SUPABASE_ANON_KEY · TELEGRAM_BOT_TOKEN · TELEGRAM_CHAT_ID
+# (anon key only — it is the same public key the site already ships).
+
+on:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Send briefing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node tools/daily-brief.mjs

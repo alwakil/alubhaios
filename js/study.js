@@ -42,6 +42,7 @@ const Study = {
         <button class="tab ${this.tab === 'modules' ? 'active' : ''}" data-stab="modules">${icon('graduation-cap')} Study modules</button>
         <button class="tab ${this.tab === 'ctf' ? 'active' : ''}" data-stab="ctf">${icon('flag')} CTF tracker</button>
       </div>
+      <div class="card" id="skill-map"></div>
       <div id="study-body"></div>
     `;
 
@@ -51,8 +52,36 @@ const Study = {
       this.handleAction(e);
     };
 
+    this.renderSkillMap(qs('#skill-map', container));
     if (this.tab === 'modules') this.renderModules(qs('#study-body', container));
     else this.renderCtf(qs('#study-body', container));
+  },
+
+  /** 🧠 skill map — solved challenges by category over 12 weeks + module
+      progress + the weakest-category callout. Hidden when no data. */
+  renderSkillMap(cardEl) {
+    if (!cardEl) return;
+    const map = Analytics.skillMap(12);
+    if (!map.totalSolved && !map.modules.total) { cardEl.hidden = true; return; }
+    cardEl.hidden = false;
+    const cell = (n) => n > 0
+      ? `<div class="sk-cell sk-n${Math.min(4, n)}" title="${n} solved">${n > 2 ? n : ''}</div>`
+      : '<div class="sk-cell" title="0 solved"></div>';
+    cardEl.innerHTML = `
+      <h3 class="card-title">${icon('brain')} Skill map — last 12 weeks</h3>
+      <div class="sk-meta">
+        <span class="chip" style="--chip-c:#10b981">${icon('flag-checkered')} Solved <b>${map.totalSolved}</b></span>
+        <span class="chip" style="--chip-c:#6366f1">${icon('graduation-cap')} Modules <b>${map.modules.done}/${map.modules.total}</b> (${map.modules.pct}%)</span>
+        ${map.weakest ? `<span class="chip" style="--chip-c:#f59e0b">${icon('bullseye')} focus: ${Utils.esc(map.weakest.category)} (${map.weakest.total} solved)</span>` : ''}
+      </div>
+      ${map.cats.map(c => `
+        <div class="sk-row">
+          <span class="sk-cat" title="${c.total} solved total${c.last ? ' · last: ' + c.last : ''}">${Utils.esc(c.category)}</span>
+          <div class="sk-weeks">${c.weekly.map(cell).join('')}</div>
+          <b class="sk-total">${c.total}</b>
+        </div>`).join('')}
+      ${map.cats.length ? '<div class="muted small" style="margin-top:6px">Each cell = one week. Darker = more solved that week. 🎯 focus = fewest solved — train there next.</div>'
+        : '<div class="muted small">Solve your first CTF challenge and the map lights up.</div>'}`;
   },
 
   /* ================= Study modules ================= */
