@@ -102,6 +102,9 @@ const Settings = {
           </div>
         </div>
 
+        <!-- Subscriptions (fixed-date countdown) -->
+        <div class="card" id="subs-card"></div>
+
         <!-- Deadlines setup (only shown when the due_date column is missing) -->
         ${App.dueDateSupported === false ? `
         <div class="card">
@@ -361,6 +364,9 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
         })
         .catch(err => App.handleError(err));
     }, { once: false });
+
+    /* --- subscriptions (fixed-date countdown) --- */
+    if (typeof Subs !== 'undefined' && Subs.settingsCard) Subs.settingsCard(container);
 
     // PWA install hint
     const pwa = qs('#pwa-hint', container);

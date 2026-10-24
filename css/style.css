@@ -1257,3 +1257,18 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 .money-in { color: var(--c-success, #10b981); }
 .money-out { color: var(--c-danger, #ef4444); }
 .money-nag { color: var(--c-warn, #f5c518); }
+
+/* ================= v2.12.0 — subscriptions (fixed-date countdown) ================= */
+.sub-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.sub-row:last-child { border-bottom: none; }
+.sub-row .sub-label { font-size: 13.5px; }
+.sub-date { padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card, transparent); color: inherit; font-size: 12.5px; margin-left: auto; }
+.subs-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.subs-add input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card, transparent); color: inherit; font-size: 13px; }
+.subs-add input#sub-label { flex: 1; min-width: 140px; }
+.subs-opts { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+.subs-check { display: flex; align-items: center; gap: 6px; font-size: 12.5px; padding-bottom: 8px; cursor: pointer; }
+.sub-pop-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+.sub-pop-label { font-size: 14px; font-weight: 600; }
+.sub-pop-count { display: flex; align-items: baseline; gap: 6px; }
+.sub-pop-days { font-size: 1.45rem; line-height: 1; }

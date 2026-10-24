@@ -98,6 +98,7 @@ const Dashboard = {
       <div class="card" id="dash-priorities"></div>
       <div class="card dash-upcoming" id="dash-upcoming" hidden></div>
       <div class="card dash-upcoming" id="dash-deadlines" hidden></div>
+      <div class="card dash-upcoming" id="dash-subs" hidden></div>
 
       <div class="quick-actions">
         <button class="btn btn-primary" data-qa="task">${icon('plus')} New task</button>
@@ -156,6 +157,9 @@ const Dashboard = {
           `<a class="link small" href="#/tasks">Open tasks ${icon('arrow-right', 'fa-xs')}</a>`;
       }
     }
+
+    // 💳 subscriptions — fixed end dates (HTB, courses…) with days-left chips
+    if (typeof Subs !== 'undefined' && Subs.dashboardCard) Subs.dashboardCard(container);
 
     // score ring
     const track = Charts.cssVar('--chart-grid') || 'rgba(150,160,180,.2)';

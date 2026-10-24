@@ -167,6 +167,8 @@ const App = {
     this.updateConnUI();
     this.route();
     this.checkLevelUp();
+    // ⏳ subscription countdown popup — at most once a day, never blocks boot
+    try { if (typeof Subs !== 'undefined' && Subs.maybePopup) Subs.maybePopup(); } catch (e) { /* ignore */ }
   },
 
   /** 🎉 level-up celebration — fires once per new level (pref-tracked). */
