@@ -330,10 +330,10 @@ const Dashboard = {
     const brief = this.morningBriefing(tasksToday, routines, today);
     qs('#today-brief', container).innerHTML = brief.map(i => {
       if (i.pace) {
-        const pc = i.pace.state === 'behind' ? '#ef4444' : '#f59e0b';
+        const pc = i.pace.state === 'behind' ? '#ef4444' : i.pace.state === 'slightly' ? '#f59e0b' : '#10b981';
         return `<div class="pace-row" data-goal-link="${Utils.esc(i.pace.goalId)}" title="Open this goal" role="button" tabindex="0">
           <div class="pace-days" style="color:${pc}">
-            <b>${i.pace.daysLeft}</b><span>days left</span>
+            <b>${i.pace.daysLeft}</b><span>${i.pace.daysLeft === 1 ? 'day' : 'days'} left</span>
           </div>
           <div class="pace-main">
             <div class="pace-head">
@@ -465,16 +465,23 @@ const Dashboard = {
       if (s > bestS) { bestS = s; bestR = r; }
     });
     if (bestS >= 2) lines.push({ icon: 'fire', tone: 'good', text: `🔥 "${bestR.title}" is on a ${bestS}-day streak — don't break the chain.` });
+    // goal pace rows — EVERY active goal with a target date gets a bar
+    // (red behind · amber slightly · green on-track), soonest deadline first
+    const paceRows = [];
     (App.state.goals || []).forEach(g => {
       if (g.status !== 'active') return;
       const p = (typeof GoalPace !== 'undefined' && GoalPace.pace) ? GoalPace.pace(g) : null;
-      if (p && p.state === 'behind') lines.push({
-        icon: 'gauge-high', tone: 'warn',
-        text: `⚠ "${g.title}" is behind pace — needs ~${p.needPerMonth}%/mo (${p.daysLeft}d left).`,
-        // pace payload → Today renders this line as an interactive pace bar
+      if (!p) return;
+      paceRows.push({
+        icon: 'gauge-high', tone: p.state === 'behind' ? 'warn' : 'info',
+        text: p.state === 'behind'
+          ? `⚠ "${g.title}" is behind pace — needs ~${p.needPerMonth}%/mo (${p.daysLeft}d left).`
+          : `"${g.title}" is on track — ${p.daysLeft}d left (${p.actual}% done).`,
         pace: { goalId: g.id, title: g.title, actual: p.actual, expected: p.expected, needPerMonth: p.needPerMonth, daysLeft: p.daysLeft, state: p.state }
       });
     });
+    paceRows.sort((a, b) => a.pace.daysLeft - b.pace.daysLeft);
+    lines.push(...paceRows);
     return lines;
   },
 
