@@ -332,15 +332,20 @@ const Dashboard = {
       if (i.pace) {
         const pc = i.pace.state === 'behind' ? '#ef4444' : '#f59e0b';
         return `<div class="pace-row" data-goal-link="${Utils.esc(i.pace.goalId)}" title="Open this goal" role="button" tabindex="0">
-          <div class="pace-head">
-            <span class="pace-name">${icon(i.icon)} ${Utils.esc(i.pace.title)}</span>
-            <span class="muted small">${i.pace.daysLeft}d left · ~${i.pace.needPerMonth}%/mo needed</span>
+          <div class="pace-days" style="color:${pc}">
+            <b>${i.pace.daysLeft}</b><span>days left</span>
           </div>
-          <div class="pace-bar" title="${i.pace.actual}% done · should be ~${i.pace.expected}% by today">
-            <div class="pace-fill" style="width:${i.pace.actual}%;background:${pc}"></div>
-            <div class="pace-tick" style="left:${i.pace.expected}%"></div>
+          <div class="pace-main">
+            <div class="pace-head">
+              <span class="pace-name">${icon(i.icon)} ${Utils.esc(i.pace.title)}</span>
+              <span class="muted small">~${i.pace.needPerMonth}%/mo needed</span>
+            </div>
+            <div class="pace-bar" title="${i.pace.actual}% done · should be ~${i.pace.expected}% by today">
+              <div class="pace-fill" style="width:${i.pace.actual}%;background:${pc}"></div>
+              <div class="pace-tick" style="left:${i.pace.expected}%"></div>
+            </div>
+            <div class="pace-nums"><span class="muted small">${i.pace.actual}% done</span><span class="muted small">should be ~${i.pace.expected}% today</span></div>
           </div>
-          <div class="pace-nums"><span class="muted small">${i.pace.actual}% done</span><span class="muted small">should be ~${i.pace.expected}% today</span></div>
         </div>`;
       }
       return `<div class="insight-card tone-${i.tone}">${icon(i.icon)}<span>${Utils.esc(i.text)}</span></div>`;

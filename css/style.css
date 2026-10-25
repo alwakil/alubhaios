@@ -1274,9 +1274,13 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 .sub-pop-days { font-size: 1.45rem; line-height: 1; }
 
 /* ================= v2.12.3 — interactive pace bars (morning briefing) ================= */
-.pace-row { cursor: pointer; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; transition: border-color .15s, background .15s; }
+.pace-row { cursor: pointer; display: flex; align-items: center; gap: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; transition: border-color .15s, background .15s, box-shadow .15s, transform .15s; }
 .pace-row:last-child { margin-bottom: 0; }
-.pace-row:hover { border-color: #ef4444; background: rgba(239, 68, 68, .07); }
+.pace-row:hover, .pace-row:focus-visible { border-color: #ef4444; background: rgba(239, 68, 68, .07); box-shadow: 0 2px 10px rgba(239, 68, 68, .12); transform: translateY(-1px); outline: none; }
+.pace-days { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 64px; padding-right: 14px; border-right: 1px solid var(--border); line-height: 1.05; }
+.pace-days b { font-size: 1.7rem; font-weight: 800; }
+.pace-days span { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+.pace-main { flex: 1; min-width: 0; }
 .pace-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 7px; }
 .pace-name { font-weight: 600; font-size: 13.5px; }
 .pace-bar { position: relative; height: 10px; background: rgba(150, 160, 180, .22); border-radius: 6px; }
