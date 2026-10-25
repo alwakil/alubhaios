@@ -67,6 +67,10 @@
 
   .task-card, .review-card, .session-card { flex-wrap: wrap; }
   .task-actions { width: 100%; justify-content: flex-end; }
+  /* goal cards: 6-button cluster must wrap under the title, not push the page wide */
+  .goal-head { flex-wrap: wrap; }
+  .goal-head .task-actions { width: 100%; justify-content: flex-start; }
+  .goal-head > div:first-child { min-width: 0; }
   .routine-card { flex-wrap: wrap; }
   .routine-time-big { min-width: 52px; font-size: 15px; }
   .danger-row { flex-direction: column; align-items: stretch; text-align: left; }
