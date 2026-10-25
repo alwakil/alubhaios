@@ -326,10 +326,29 @@ const Dashboard = {
       </div>
     `;
 
-    // 🌅 morning briefing
+    // 🌅 morning briefing — behind-pace goals render as interactive pace bars
     const brief = this.morningBriefing(tasksToday, routines, today);
-    qs('#today-brief', container).innerHTML = brief.map(i =>
-      `<div class="insight-card tone-${i.tone}">${icon(i.icon)}<span>${Utils.esc(i.text)}</span></div>`).join('');
+    qs('#today-brief', container).innerHTML = brief.map(i => {
+      if (i.pace) {
+        const pc = i.pace.state === 'behind' ? '#ef4444' : '#f59e0b';
+        return `<div class="pace-row" data-goal-link="${Utils.esc(i.pace.goalId)}" title="Open this goal" role="button" tabindex="0">
+          <div class="pace-head">
+            <span class="pace-name">${icon(i.icon)} ${Utils.esc(i.pace.title)}</span>
+            <span class="muted small">${i.pace.daysLeft}d left · ~${i.pace.needPerMonth}%/mo needed</span>
+          </div>
+          <div class="pace-bar" title="${i.pace.actual}% done · should be ~${i.pace.expected}% by today">
+            <div class="pace-fill" style="width:${i.pace.actual}%;background:${pc}"></div>
+            <div class="pace-tick" style="left:${i.pace.expected}%"></div>
+          </div>
+          <div class="pace-nums"><span class="muted small">${i.pace.actual}% done</span><span class="muted small">should be ~${i.pace.expected}% today</span></div>
+        </div>`;
+      }
+      return `<div class="insight-card tone-${i.tone}">${icon(i.icon)}<span>${Utils.esc(i.text)}</span></div>`;
+    }).join('');
+    // pace bars are interactive: tap/click one → jump to that goal
+    qs('#today-brief', container).addEventListener('click', e => {
+      if (e.target.closest('[data-goal-link]')) location.hash = '#/goals';
+    });
 
     // top 3 priorities (frog gets its badge here too)
     const frog = this.frogTask(tasksToday);
@@ -444,7 +463,12 @@ const Dashboard = {
     (App.state.goals || []).forEach(g => {
       if (g.status !== 'active') return;
       const p = (typeof GoalPace !== 'undefined' && GoalPace.pace) ? GoalPace.pace(g) : null;
-      if (p && p.state === 'behind') lines.push({ icon: 'gauge-high', tone: 'warn', text: `⚠ "${g.title}" is behind pace — needs ~${p.needPerMonth}%/mo (${p.daysLeft}d left).` });
+      if (p && p.state === 'behind') lines.push({
+        icon: 'gauge-high', tone: 'warn',
+        text: `⚠ "${g.title}" is behind pace — needs ~${p.needPerMonth}%/mo (${p.daysLeft}d left).`,
+        // pace payload → Today renders this line as an interactive pace bar
+        pace: { goalId: g.id, title: g.title, actual: p.actual, expected: p.expected, needPerMonth: p.needPerMonth, daysLeft: p.daysLeft, state: p.state }
+      });
     });
     return lines;
   },

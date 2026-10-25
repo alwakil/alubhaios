@@ -7,7 +7,7 @@
    ============================================================ */
 'use strict';
 
-const CACHE = 'alubhaios-v2.12.2';
+const CACHE = 'alubhaios-v2.12.3';
 /* everything index.html references + the fonts its vendor CSS pulls in —
    offline must open the full app, not a blank screen */
 const CORE = [

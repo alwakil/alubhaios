@@ -1272,3 +1272,14 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 .sub-pop-label { font-size: 14px; font-weight: 600; }
 .sub-pop-count { display: flex; align-items: baseline; gap: 6px; }
 .sub-pop-days { font-size: 1.45rem; line-height: 1; }
+
+/* ================= v2.12.3 — interactive pace bars (morning briefing) ================= */
+.pace-row { cursor: pointer; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; transition: border-color .15s, background .15s; }
+.pace-row:last-child { margin-bottom: 0; }
+.pace-row:hover { border-color: #ef4444; background: rgba(239, 68, 68, .07); }
+.pace-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 7px; }
+.pace-name { font-weight: 600; font-size: 13.5px; }
+.pace-bar { position: relative; height: 10px; background: rgba(150, 160, 180, .22); border-radius: 6px; }
+.pace-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; transition: width .3s; }
+.pace-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #94a3b8; border-radius: 1px; }
+.pace-nums { display: flex; justify-content: space-between; margin-top: 5px; }
