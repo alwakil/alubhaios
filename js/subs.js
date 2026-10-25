@@ -94,7 +94,7 @@ const Subs = {
       const cfg = self.config();
       card.innerHTML = `
         <h3 class="card-title">${icon('credit-card')} Subscriptions</h3>
-        <p class="muted small">Countdown to fixed end dates (HTB, courses, licenses…). The popup appears once a day on app open; the dashboard gets a strip too.</p>
+        <p class="muted small">Countdown to fixed end dates (HTB, courses, licenses…). The popup greets the first app open of morning, afternoon and night; the dashboard gets a strip too.</p>
         <div id="subs-list">
           ${cfg.items.length ? self.sorted(cfg.items).map(it => {
             const d = self.daysLeft(it.expiry);
@@ -116,7 +116,7 @@ const Subs = {
         <div class="subs-opts">
           <label class="field" style="max-width:150px"><span>Warn below (days)</span>
             <input type="number" id="sub-warn" min="1" max="365" value="${cfg.warnDays}"></label>
-          <label class="subs-check"><input type="checkbox" id="sub-popup" ${cfg.showPopup ? 'checked' : ''}> Show popup on app open (once a day)</label>
+          <label class="subs-check"><input type="checkbox" id="sub-popup" ${cfg.showPopup ? 'checked' : ''}> Show popup on app open (morning · afternoon · night)</label>
         </div>`;
 
       /* add — label + fixed end date required; exact duplicates rejected */
@@ -206,12 +206,24 @@ const Subs = {
       `<a class="link small" href="#/settings">Manage in Settings ${icon('arrow-right', 'fa-xs')}</a>`;
   },
 
-  /* ================= Boot popup — at most once a day ================= */
-  maybePopup() {
+  /* ================= Boot popup — 3× a day (morning/afternoon/night) =================
+     The day splits into 3 slots: morning 5–12, afternoon 12–18, night 18–5.
+     The popup fires on the first app open of each slot; any dismissal
+     (OK / ✕ / overlay click) marks that slot as seen. */
+  slotOf(hour) {
+    const h = ((Number(hour) % 24) + 24) % 24;
+    if (h >= 5 && h < 12) return 'morning';
+    if (h >= 12 && h < 18) return 'afternoon';
+    return 'night';
+  },
+
+  maybePopup(now) {
     const cfg = this.config();
     if (!cfg.showPopup || !cfg.items.length) return;
     const today = Utils.today();
-    if (Utils.pref('subsPopup.' + today)) return;
+    const slot = this.slotOf(now ? now.getHours() : new Date().getHours());
+    const seenKey = 'subsPopup.' + today + '.' + slot;
+    if (Utils.pref(seenKey)) return;
     const rows = this.sorted(cfg.items).map(it => {
       const d = this.daysLeft(it.expiry);
       const st = this.stateOf(d, cfg.warnDays);
@@ -228,8 +240,8 @@ const Subs = {
       footer: `<button class="btn btn-primary" data-act="ok">${icon('check')} OK</button>`
     });
     qs('[data-act="ok"]', m.overlay).addEventListener('click', m.close);
-    // any dismissal (OK / ✕ / overlay click) counts as "seen today"
-    m.overlay.addEventListener('modal:closed', () => Utils.pref('subsPopup.' + today, true), { once: true });
+    // any dismissal (OK / ✕ / overlay click) counts as "seen this slot"
+    m.overlay.addEventListener('modal:closed', () => Utils.pref(seenKey, true), { once: true });
   }
 };
 window.Subs = Subs;

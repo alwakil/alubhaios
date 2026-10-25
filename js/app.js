@@ -167,7 +167,8 @@ const App = {
     this.updateConnUI();
     this.route();
     this.checkLevelUp();
-    // ⏳ subscription countdown popup — at most once a day, never blocks boot
+    // ⏳ subscription countdown popup — 3× a day (morning/afternoon/night),
+    // first open of each slot; never blocks boot
     try { if (typeof Subs !== 'undefined' && Subs.maybePopup) Subs.maybePopup(); } catch (e) { /* ignore */ }
   },
 
