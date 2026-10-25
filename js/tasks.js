@@ -427,6 +427,13 @@ const Tasks = {
     }).sort((a, b) => {
       const r = { high: 0, medium: 1, low: 2 };
       const s = { pending: 0, 'in-progress': 1, completed: 2 };
+      // completed block: NEWEST completion on top (option A) — the task just
+      // finished lands first; rows saved before completed_at fall back to date
+      if (a.status === 'completed' && b.status === 'completed') {
+        const ca = String(a.completed_at || a.scheduled_date || '');
+        const cb = String(b.completed_at || b.scheduled_date || '');
+        return cb.localeCompare(ca);
+      }
       return (s[a.status] - s[b.status]) || (r[a.priority] - r[b.priority]) ||
              String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999'));
     });
