@@ -71,6 +71,8 @@
   .goal-head { flex-wrap: wrap; }
   .goal-head .task-actions { width: 100%; justify-content: flex-start; }
   .goal-head > div:first-child { min-width: 0; }
+  /* subscription rows: date + delete share one line instead of the ❌ orphaning */
+  .sub-row .sub-date { flex: 1 1 140px; margin-left: 0; }
   .routine-card { flex-wrap: wrap; }
   .routine-time-big { min-width: 52px; font-size: 15px; }
   .danger-row { flex-direction: column; align-items: stretch; text-align: left; }
