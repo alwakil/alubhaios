@@ -1287,3 +1287,15 @@ button.rt-dot:focus-visible { outline: 2px solid var(--c-primary); outline-offse
 .pace-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; transition: width .3s; }
 .pace-tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #94a3b8; border-radius: 1px; }
 .pace-nums { display: flex; justify-content: space-between; margin-top: 5px; }
+
+/* ================= v2.13.0 — score explainer ================= */
+.score-center { cursor: pointer; border-radius: 50%; }
+.score-center:hover .score-num { filter: brightness(1.15); }
+.score-hint { font-size: 10px; opacity: .65; margin-top: 2px; }
+.score-explain-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.score-explain-row:last-of-type { border-bottom: none; }
+.score-explain-row .se-label { font-weight: 600; min-width: 74px; font-size: 13.5px; }
+.score-explain-row .se-why { flex: 1; }
+.score-explain-row .se-pts { min-width: 58px; text-align: right; font-size: 15px; }
+.score-explain-total { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; font-size: 14px; }
+.score-explain-total b { font-size: 1.2rem; }

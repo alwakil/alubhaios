@@ -87,6 +87,10 @@ const Settings = {
           <p class="muted small" id="notif-status">Status: <b>${('Notification' in window) ? Notification.permission : 'unsupported'}</b> — routine reminders + pomodoro alerts.</p>
           <p class="muted small">Reminders fire while the app is open (a pinned tab works great).</p>
           <button class="btn" id="notif-enable">${icon('bell')} Enable notifications</button>
+          <label class="subs-check" style="margin-top:10px">
+            <input type="checkbox" id="set-morning-notify" ${App.settings.morning_notify !== 'off' ? 'checked' : ''}>
+            Morning brief — today's plan as a notification on the first app open before noon
+          </label>
         </div>
 
         <!-- Grace mode (exam mode) -->
@@ -104,6 +108,16 @@ const Settings = {
 
         <!-- Subscriptions (fixed-date countdown) -->
         <div class="card" id="subs-card"></div>
+
+        <!-- Auto-progress (v2.13.0) -->
+        <div class="card">
+          <h3 class="card-title">${icon('arrows-rotate')} Auto progress</h3>
+          <label class="subs-check" style="padding-bottom:0">
+            <input type="checkbox" id="set-goal-auto" ${App.settings.goal_auto_progress !== 'off' ? 'checked' : ''}>
+            Auto-update goal % when a linked task is completed or undone
+          </label>
+          <p class="muted small">Goals without linked tasks are never touched — set those by hand or with ↻ Sync as before.</p>
+        </div>
 
         <!-- Deadlines setup (only shown when the due_date column is missing) -->
         ${App.dueDateSupported === false ? `
@@ -297,6 +311,24 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
       if (ok) toast('Notifications enabled 🔔', 'success');
       const st = qs('#notif-status', container);
       if (st && 'Notification' in window) st.innerHTML = `Status: <b>${Notification.permission}</b> — routine reminders + pomodoro alerts.`;
+    });
+    /* --- v2.13.0 toggles --- */
+    qs('#set-goal-auto', container).addEventListener('change', async () => {
+      const on = qs('#set-goal-auto', container).checked;
+      try {
+        await API.saveSettings({ goal_auto_progress: on ? '' : 'off' });
+        App.settings.goal_auto_progress = on ? '' : 'off';
+        toast(on ? '🎯 Goal auto-progress on — completing a linked task updates the goal.' : 'Goal auto-progress off — use ↻ Sync as before.', 'info');
+      } catch (e) { App.handleError(e); }
+    });
+    qs('#set-morning-notify', container).addEventListener('change', async () => {
+      const on = qs('#set-morning-notify', container).checked;
+      try {
+        await API.saveSettings({ morning_notify: on ? '' : 'off' });
+        App.settings.morning_notify = on ? '' : 'off';
+        if (on) askNotifyPermission();
+        toast(on ? '🌅 Morning brief on — a plan notification when you first open the app before noon.' : 'Morning brief off.', 'info');
+      } catch (e) { App.handleError(e); }
     });
 
     /* --- grace mode (exam mode) --- */

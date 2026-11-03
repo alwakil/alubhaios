@@ -27,9 +27,10 @@ const Dashboard = {
         <div class="card score-card">
           <div class="score-ring-wrap">
             <canvas id="score-ring" width="170" height="170"></canvas>
-            <div class="score-center">
+            <div class="score-center" data-act="score-explain" role="button" tabindex="0" title="What does this score mean? Tap to see the breakdown">
               <div class="score-num">${t.score}</div>
               <div class="score-denom">/ 100</div>
+              <div class="score-hint">${icon('circle-question')} why?</div>
             </div>
           </div>
           <h3 class="card-title">Productivity Score</h3>
@@ -101,6 +102,13 @@ const Dashboard = {
       <div class="card dash-upcoming" id="dash-subs" hidden></div>
 
       <div class="quick-actions">
+        ${(() => {
+          const ls = (typeof Focus !== 'undefined' && Focus.lastSetup) ? Focus.lastSetup() : null;
+          if (!ls || (typeof Focus !== 'undefined' && (Focus.timer || Focus.pomo))) return '';
+          const t = (App.state.tasks || []).find(x => x.id === ls.taskId);
+          const label = t ? t.title : (ls.mode || (ls.kind === 'pomo' ? 'Pomodoro' : 'Focus'));
+          return `<button class="btn btn-primary" data-qa="resume" title="One tap — restart your last focus setup">${icon('play')} Resume: ${Utils.esc(String(label).slice(0, 24))}</button>`;
+        })()}
         <button class="btn btn-primary" data-qa="task">${icon('plus')} New task</button>
         <button class="btn" data-qa="focus">${icon('play')} Start focus</button>
         <a class="btn btn-ghost" href="#/reviews">${icon('pen-to-square')} Daily review</a>
@@ -162,8 +170,7 @@ const Dashboard = {
     if (typeof Subs !== 'undefined' && Subs.dashboardCard) Subs.dashboardCard(container);
 
     // score ring
-    const track = Charts.cssVar('--chart-grid') || 'rgba(150,160,180,.2)';
-    Charts.make('score-ring', {
+    const track = Charts.cssVar('--chart-grid') || 'rgba(150,160,180,.2)';    Charts.make('score-ring', {
       type: 'doughnut',
       data: { datasets: [{ data: [t.score, 100 - t.score], backgroundColor: [Charts.theme().primary, track], borderWidth: 0, borderRadius: 20 }] },
       options: { cutout: '76%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, events: [] }
@@ -498,6 +505,61 @@ const Dashboard = {
     )[0];
   },
 
+  /* ================= v2.13.0 — score explainer + morning brief text ================= */
+
+  /** 🧮 Plain-language score breakdown (pure, testable). One line per score
+      component with the actual point math and a human "why". */
+  explainScore(t) {
+    const goal = Analytics.focusGoalMinutes();
+    const tasksPts = t.tasksPlanned > 0 ? Math.round(t.tasksCompleted / t.tasksPlanned * 40) : 0;
+    const focusPts = Math.round(Math.min(1, t.focusMinutes / goal) * 30);
+    const habitPts = t.habitTotal ? Math.round(t.habitDone / t.habitTotal * 20) : 0;
+    const distract = Math.min(10, Math.round(t.distractionMinutes / 6));
+    return [
+      { icon: 'list-check', label: 'Tasks', pts: tasksPts, max: 40,
+        why: t.tasksPlanned > 0 ? `${t.tasksCompleted} of ${t.tasksPlanned} planned done` : 'No tasks planned today — plan a few to earn these points' },
+      { icon: 'stopwatch', label: 'Focus', pts: focusPts, max: 30,
+        why: `${Utils.fmtMinutes(t.focusMinutes)} of your ${Utils.fmtMinutes(goal)} daily goal` },
+      { icon: 'fire', label: 'Habits', pts: habitPts, max: 20,
+        why: t.habitTotal ? `${t.habitDone} of ${t.habitTotal} checked in` : 'No habits enabled yet' },
+      { icon: 'phone-flip', label: 'Distraction', pts: -distract, max: 10,
+        why: t.distractionMinutes > 0 ? `${Utils.fmtMinutes(t.distractionMinutes)} of distraction → −${distract} pts` : 'Clean day — nothing deducted' }
+    ];
+  },
+
+  /** 🧮 Modal: tap the score ring → what moved the number and the biggest lever. */
+  explainScoreModal() {
+    const t = Analytics.todayStats();
+    const lines = this.explainScore(t);
+    const total = lines.reduce((a, l) => a + l.pts, 0);
+    const lever = lines.filter(l => l.pts < l.max).sort((a, b) => (b.max - b.pts) - (a.max - a.pts))[0];
+    const body = `<div class="score-explain">
+      ${lines.map(l => `
+        <div class="score-explain-row">
+          ${icon(l.icon)}
+          <span class="se-label">${l.label}</span>
+          <span class="se-why muted small">${Utils.esc(l.why)}</span>
+          <b class="se-pts" style="color:${l.pts < 0 ? '#ef4444' : l.pts >= l.max ? '#10b981' : 'inherit'}">${l.pts > 0 ? '+' : ''}${l.pts}<span class="muted small">/${l.max}</span></b>
+        </div>`).join('')}
+      <div class="score-explain-total"><span>Total today</span><b>${t.score}/100</b></div>
+      ${lever ? `<p class="muted small" style="margin:8px 0 0">💡 Biggest lever right now: <b>${lever.label}</b> — ${lever.max - lever.pts} pts still available there.</p>` : ''}
+    </div>`;
+    const m = openModal({
+      title: '🧮 Score breakdown',
+      body: body,
+      footer: `<button class="btn btn-primary" data-act="ok">${icon('check')} Got it</button>`
+    });
+    qs('[data-act="ok"]', m.overlay).addEventListener('click', m.close);
+  },
+
+  /** 🌅 One-line morning brief for the notification (pure, testable). */
+  morningBriefText(pendCount, frogTitle, deadlineCount) {
+    const parts = [pendCount + ' task' + (pendCount === 1 ? '' : 's') + ' today'];
+    if (frogTitle) parts.push('frog first: ' + frogTitle);
+    if (deadlineCount) parts.push(deadlineCount + ' deadline' + (deadlineCount === 1 ? '' : 's') + ' this week');
+    return parts.join(' · ');
+  },
+
   /** Day timeline builder — pure (testable). Routines sorted by time with
       past/now/upcoming state + streaks; one "anytime tasks" entry appended. */
   todayTimelineEntries(routines, tasksToday, nowMin) {
@@ -545,8 +607,13 @@ const Dashboard = {
     if (qa) {
       if (qa.dataset.qa === 'task') Tasks.openForm();
       if (qa.dataset.qa === 'focus') { location.hash = '#/focus'; }
+      if (qa.dataset.qa === 'resume') {
+        if (Focus.resumeLast()) location.hash = '#/focus';
+      }
       return;
     }
+    const sexp = e.target.closest('[data-act="score-explain"]');
+    if (sexp) { this.explainScoreModal(); return; }
     const habitBtn = e.target.closest('[data-habit]');
     if (habitBtn) { Habits.toggleToday(habitBtn.dataset.habit); return; }
     const chk = e.target.closest('[data-task-checklist]');

@@ -122,6 +122,8 @@ const Focus = {
       mode: mode || 'Deep Work', category: category || 'Learning', taskId: taskId || '',
       goalId: goalId || ''
     };
+    // one-tap resume (v2.13.0): remember this setup so Dashboard can restart it
+    Utils.pref('lastFocusSetup', { kind: 'stopwatch', mode: this.timer.mode, category: this.timer.category, taskId: this.timer.taskId, goalId: this.timer.goalId });
     this.save();
     toast('Focus session started — good luck!', 'success');
     App.refreshCurrent();
@@ -265,6 +267,8 @@ const Focus = {
       taskId: taskId || '', category: category || 'Learning',
       goalId: goalId || ''
     };
+    // one-tap resume (v2.13.0): remember this setup so Dashboard can restart it
+    Utils.pref('lastFocusSetup', { kind: 'pomo', focusMin: this.pomo.focusMin, breakMin: this.pomo.breakMin, taskId: this.pomo.taskId, category: this.pomo.category, goalId: this.pomo.goalId });
     this.setView('pomodoro'); // starting a pomodoro must show the pomodoro panel
     this.savePomo();
     askNotifyPermission(); // gentle: ask once when they start using pomodoros
@@ -281,6 +285,28 @@ const Focus = {
     t.pauseNagCycle = 0; // fresh nag cycle for this pause
     this.savePomo();
     App.refreshCurrent();
+  },
+
+  /* ================= one-tap resume (v2.13.0) ================= */
+
+  /** The last saved setup (pref), or null. */
+  lastSetup() {
+    const s = Utils.pref('lastFocusSetup');
+    return (s && s.kind) ? s : null;
+  },
+
+  /** Restart the user's last focus setup with one tap. Returns false when
+      nothing is saved or a timer is already live. */
+  resumeLast() {
+    if (this.timer || (this.pomo && this.pomo.phase)) {
+      toast('A focus timer is already running.', 'warn');
+      return false;
+    }
+    const s = this.lastSetup();
+    if (!s) { toast('No previous focus setup yet — set one up first.', 'info'); return false; }
+    if (s.kind === 'pomo') this.startPomo(Utils.num(s.focusMin) || 50, Utils.num(s.breakMin) || 10, s.taskId, s.category, s.goalId);
+    else this.start(s.mode, s.category, s.taskId, s.goalId);
+    return true;
   },
 
   pomoResume() {

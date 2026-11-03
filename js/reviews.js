@@ -409,6 +409,7 @@ const Reviews = {
           <label class="field"><span>Notes</span>
             <textarea id="wr-notes" rows="2">${Utils.esc(existing ? existing.notes : '')}</textarea></label>
           <div class="form-actions">
+            <button class="btn" id="wr-autodraft" title="Draft all four fields from this week's real data">${icon('wand-magic-sparkles')} Auto-draft</button>
             <button class="btn btn-primary" id="weekly-save">${icon('check')} ${existing ? 'Update weekly review' : 'Save weekly review'}</button>
           </div>
         </div>
@@ -438,6 +439,19 @@ const Reviews = {
       this.page(App.container());
     }));
 
+    /* ✨ auto-draft (v2.13.0) — fill empty reflection fields from week data */
+    qs('#wr-autodraft', container).addEventListener('click', () => {
+      const draft = this.autoWeeklyDraft(days, prevDays);
+      const map = [['#wr-win', 'biggest_win'], ['#wr-problem', 'biggest_problem'], ['#wr-next', 'next_week_focus'], ['#wr-notes', 'notes']];
+      let filled = 0;
+      map.forEach(([sel, key]) => {
+        const el2 = qs(sel, container);
+        if (el2 && !el2.value.trim() && draft[key]) { el2.value = draft[key]; filled++; }
+      });
+      if (filled) toast(`✨ Drafted ${filled} field${filled === 1 ? '' : 's'} from your week — edit anything you like.`, 'success');
+      else toast('All fields already filled — nothing to draft.', 'info');
+    });
+
     qs('#weekly-save', container).addEventListener('click', () => {
       const data = {
         week_start: weekStart,
@@ -450,8 +464,7 @@ const Reviews = {
         biggest_problem: qs('#wr-problem', container).value,
         next_week_focus: qs('#wr-next', container).value,
         notes: qs('#wr-notes', container).value
-      };
-      const btn = qs('#weekly-save', container);
+      };      const btn = qs('#weekly-save', container);
       if (btn) { btn.disabled = true; btn.innerHTML = `${icon('spinner', 'fa-spin')} Saving…`; }
       API.createWeeklyReview(data)
         .then(rec => { App.replaceRecord('weeklyReviews', rec); App.refreshCurrent(); toast('Weekly review saved', 'success'); })
@@ -523,5 +536,43 @@ const Reviews = {
           .then(() => { App.state.weeklyReviews = App.state.weeklyReviews.filter(x => x.id !== r.id); App.refreshCurrent(); toast('Weekly review deleted', 'success'); })
           .catch(e => App.handleError(e));
       });
+  },
+
+  /* ================= ✨ weekly autopilot (v2.13.0) ================= */
+
+  /** Draft the four reflection fields from real week data (pure, testable).
+      days/prevDays = Analytics.dayStat() arrays for this week and last. */
+  autoWeeklyDraft(days, prevDays) {
+    const sum = k => days.reduce((a, d) => a + d[k], 0);
+    const activeDays = days.filter(d => d.active);
+    const avg = activeDays.length ? Math.round(activeDays.reduce((a, d) => a + d.score, 0) / activeDays.length) : 0;
+    const habitPct = Math.round(sum('habitTotal') ? sum('habitDone') / sum('habitTotal') * 100 : 0);
+    const best = activeDays.length ? activeDays.reduce((a, d) => d.score > a.score ? d : a) : null;
+    const done = sum('tasksCompleted');
+    const missed = Math.max(0, sum('tasksPlanned') - done);
+    const distract = sum('distractionMinutes');
+    const pActive = prevDays.filter(d => d.active);
+    const pAvg = pActive.length ? Math.round(pActive.reduce((a, d) => a + d.score, 0) / pActive.length) : null;
+    const pDistract = prevDays.reduce((a, d) => a + d.distractionMinutes, 0);
+
+    const biggest_win = done > 0 || activeDays.length
+      ? `Completed ${done} task${done === 1 ? '' : 's'} with ${Utils.fmtMinutes(sum('focusMinutes'))} of focus` +
+        (best ? ` — best day ${Utils.fmtDay(best.date)} (${best.score}/100)` : '') + '.'
+      : 'A quiet week — the restart is the achievement. Pick one small task tomorrow.';
+    let biggest_problem;
+    if (missed > 0 && distract > 0) biggest_problem = `${missed} planned task${missed === 1 ? '' : 's'} slipped and ${Utils.fmtMinutes(distract)} went to distraction.`;
+    else if (missed > 0) biggest_problem = `${missed} planned task${missed === 1 ? '' : 's'} slipped this week.`;
+    else if (distract > 0) biggest_problem = `${Utils.fmtMinutes(distract)} of distraction time crept in.`;
+    else biggest_problem = 'Nothing major slipped — the challenge now is raising the bar.';
+    const tips = [];
+    if (sum('habitTotal') > 0 && habitPct < 50) tips.push('shrink habits until they feel easy, then grow');
+    if (pDistract > 0 && distract > pDistract) tips.push('cut distraction back below last week');
+    else if (distract > 0) tips.push(`keep distraction under ${Utils.fmtMinutes(distract)}`);
+    if (missed > 0) tips.push('finish the slipped tasks before adding new ones');
+    if (!tips.length) tips.push('protect the streak — same plan, slightly bolder goals');
+    const next_week_focus = 'Next week: ' + tips.slice(0, 2).join('; ') + '.';
+    const notes = `Avg score ${avg}` + (pAvg !== null ? ` (last week ${pAvg})` : '') +
+      ` · habits ${habitPct}% · focus ${Utils.fmtMinutes(sum('focusMinutes'))} · completed ${done}.`;
+    return { biggest_win, biggest_problem, next_week_focus, notes };
   }
 };

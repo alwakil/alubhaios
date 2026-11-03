@@ -543,6 +543,8 @@ const Tasks = {
     try {
       const rec = completing ? await API.updateTask(t.id, patch) : await API.updateTask(t.id, patch);
       App.replaceRecord('tasks', rec);
+      // 🎯 v2.13.0: keep the linked goal's progress in sync automatically
+      if (rec.goal_id && typeof Goals !== 'undefined' && Goals.autoProgress) Goals.autoProgress(rec.goal_id);
       App.refreshCurrent();
       toast(completing ? 'Task completed 🎉' : 'Completion undone', 'success');
     } catch (e) { App.handleError(e); }

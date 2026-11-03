@@ -19,6 +19,15 @@ const GoalProgress = {
       completed: done,
       remaining: tasks.length - done
     };
+  },
+
+  /** 🎯 v2.13.0 auto-progress: % a goal WOULD have from its linked tasks.
+      null = goal has no linked tasks (never touches those). Pure, testable. */
+  pctFromTasks(goalId, tasks) {
+    const linked = (tasks || []).filter(t => t.goal_id === goalId && !t._archived);
+    if (!linked.length) return null;
+    const done = linked.filter(t => t.status === 'completed').length;
+    return Utils.clamp(Math.round(done / linked.length * 100), 0, 100);
   }
 };
 
@@ -361,6 +370,25 @@ const Goals = {
       App.refreshCurrent();
       toast(`Progress set to ${pct}% (from linked tasks)`, 'success');
     } catch (e) { App.handleError(e); }
+  },
+
+  /** 🎯 v2.13.0: auto-update a goal's progress from linked tasks when one of
+      them is completed/undone (Settings toggle goal_auto_progress, default
+      on; goals without linked tasks are never touched). Fire-and-forget. */
+  autoProgress(goalId) {
+    try {
+      if (String(App.settings.goal_auto_progress) === 'off') return;
+      const g = (App.state.goals || []).find(x => x.id === goalId);
+      if (!g || g.status === 'completed') return;
+      const pct = GoalProgress.pctFromTasks(goalId, App.state.tasks);
+      if (pct === null || Utils.num(g.progress) === pct) return;
+      API.updateGoal(g.id, { progress: String(pct) })
+        .then(rec => {
+          App.replaceRecord('goals', rec);
+          toast(`🎯 "${g.title}" auto-progress → ${pct}%`, 'info');
+        })
+        .catch(() => { /* silent — never break the task save */ });
+    } catch (e) { /* never break the task save */ }
   },
 
   async remove(goal) {

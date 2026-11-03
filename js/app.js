@@ -104,6 +104,27 @@ const App = {
   },
 
   /** Notify today's routines whose start time just arrived (0–10 min window). */
+  /* 🌅 v2.13.0 morning brief — a plan notification on the first app open of
+     the morning window (5:00–12:00), once per day, toggleable in Settings. */
+  morningBriefNotify() {
+    try {
+      if (String(this.settings.morning_notify) === 'off') return;
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const h = new Date().getHours();
+      if (h < 5 || h >= 12) return;
+      const key = 'morningNotif.' + Utils.today();
+      if (Utils.pref(key)) return;
+      Utils.pref(key, true);
+      const today = Utils.today();
+      const todays = (this.state.tasks || []).filter(t => t.scheduled_date === today && !t._archived);
+      const pend = todays.filter(t => t.status !== 'completed').length;
+      const frog = (typeof Dashboard !== 'undefined' && Dashboard.frogTask) ? Dashboard.frogTask(todays) : null;
+      const dl = (typeof Analytics !== 'undefined' && Analytics.deadlines) ? (Analytics.deadlines(7) || []).length : 0;
+      notify('🌅 ' + (this.settings.user_name ? 'Good morning, ' + this.settings.user_name : 'Good morning'),
+        (typeof Dashboard !== 'undefined' && Dashboard.morningBriefText) ? Dashboard.morningBriefText(pend, frog ? frog.title : '', dl) : pend + ' tasks today');
+    } catch (e) { /* never block boot */ }
+  },
+
   checkRoutineReminders() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const today = Utils.today();
@@ -149,6 +170,8 @@ const App = {
         this.hideSetupBanner();
         this.updateUpgradeBanner();
         this.notifyMissed();
+        // 🌅 morning brief notification — once a day, first open 5:00–12:00
+        this.morningBriefNotify();
         // 📅 deadline feature probe: does the tasks table have a due_date column?
         // (migration backend/0001-due-date.sql). Until it exists the form hides
         // the field and the dashboard strip stays off — nothing breaks.
