@@ -304,8 +304,8 @@ const Focus = {
     }
     const s = this.lastSetup();
     if (!s) { toast('No previous focus setup yet — set one up first.', 'info'); return false; }
-    if (s.kind === 'pomo') this.startPomo(Utils.num(s.focusMin) || 50, Utils.num(s.breakMin) || 10, s.taskId, s.category, s.goalId);
-    else this.start(s.mode, s.category, s.taskId, s.goalId);
+    if (s.kind === 'pomo') this.ritualGate(() => this.startPomo(Utils.num(s.focusMin) || 50, Utils.num(s.breakMin) || 10, s.taskId, s.category, s.goalId));
+    else this.ritualGate(() => this.start(s.mode, s.category, s.taskId, s.goalId));
     return true;
   },
 
@@ -454,6 +454,165 @@ const Focus = {
       <button class="btn btn-ghost btn-sm" data-clear-distraction="1" style="margin-top:6px">Clear today's entries</button>` : ''}`;
   },
 
+  /* ================= pre-focus ritual (v2.14.0) =================
+     A checklist popup before every fresh focus start (stopwatch,
+     pomodoro, one-tap resume). The Start button stays locked until
+     EVERY item is ticked — distractions are cleared BEFORE the
+     session, not just logged after. Stored in the `focus_ritual`
+     settings key: { enabled:true, items:[{id,text}] }.
+     No key yet → the starter list ships enabled. */
+
+  RITUAL_DEFAULTS: [
+    'Keep your phone away during study',
+    'Close unnecessary browser tabs',
+    'Turn off social media notifications',
+    'Keep YouTube, Facebook & other distractions closed',
+    'One task at a time',
+    'Keep study resources ready in advance',
+    'Keep a clean & dedicated study space'
+  ],
+
+  /** Whole config from App.settings.focus_ritual. Never throws —
+      bad JSON collapses to the starter list; an explicit empty list
+      (user deleted everything) is respected and skips the popup. */
+  ritualParse(raw) {
+    const cfg = { enabled: true, items: [] };
+    let known = false;
+    try {
+      const v = JSON.parse(raw || 'null');
+      if (v && typeof v === 'object') {
+        if (typeof v.enabled === 'boolean') cfg.enabled = v.enabled;
+        if (Array.isArray(v.items)) {
+          cfg.items = v.items
+            .filter(it => it && String(it.text || '').trim())
+            .map(it => ({ id: String(it.id || Utils.uid()), text: String(it.text).trim().slice(0, 80) }));
+        }
+        known = true;
+      }
+    } catch (e) { /* fall through to the starter list */ }
+    if (!known) cfg.items = this.RITUAL_DEFAULTS.map(t => ({ id: Utils.uid(), text: t }));
+    return cfg;
+  },
+
+  ritualConfig() { return this.ritualParse(App.settings.focus_ritual); },
+
+  /** Persist the whole config (single settings write). */
+  async ritualSave(cfg) {
+    const val = JSON.stringify(cfg);
+    await API.saveSettings({ focus_ritual: val });
+    App.settings.focus_ritual = val;
+  },
+
+  /** Gate a fresh focus start behind the ritual popup. Calls startFn()
+      immediately when the ritual is off / the list is empty; otherwise
+      opens the checklist modal and only fires startFn() after every
+      item is ticked. Pause/resume never goes through here. */
+  ritualGate(startFn) {
+    const cfg = this.ritualConfig();
+    if (!cfg.enabled || !cfg.items.length) { startFn(); return; }
+    const total = cfg.items.length;
+    const m = openModal({
+      title: '🧘 Pre-Focus Ritual',
+      sticky: true,
+      body: `
+        <p class="muted small" style="margin-top:0">Clear the distractions <b>before</b> the timer runs — tick every item to unlock Start.</p>
+        <div class="ritual-list">
+          ${cfg.items.map((it, i) => `
+            <label class="ritual-row">
+              <input type="checkbox" data-ritual-tick="${i}">
+              <span>${Utils.esc(it.text)}</span>
+            </label>`).join('')}
+        </div>
+        <p class="muted small ritual-progress" id="ritual-progress">0 / ${total} done</p>`,
+      footer: `
+        <button class="btn btn-ghost" data-cancel>Not now</button>
+        <button class="btn btn-primary" data-ritual-start disabled>${icon('play')} Start focused</button>`
+    });
+
+    const startBtn = qs('[data-ritual-start]', m.overlay);
+    const prog = qs('#ritual-progress', m.overlay);
+    const update = () => {
+      const done = qsa('[data-ritual-tick]:checked', m.overlay).length;
+      if (prog) prog.textContent = `${done} / ${total} done`;
+      if (startBtn) startBtn.disabled = done < total;
+    };
+    m.overlay.addEventListener('change', e => { if (e.target.closest('[data-ritual-tick]')) update(); });
+    qs('[data-cancel]', m.overlay).addEventListener('click', m.close);
+    startBtn.addEventListener('click', () => { m.close(); startFn(); });
+  },
+
+  /* ---------------- Settings → Pre-Focus Ritual card ---------------- */
+  ritualSettingsCard(container) {
+    const card = qs('#ritual-card', container || (App.container && App.container()));
+    if (!card) return;
+    const self = this;
+
+    const renderCard = () => {
+      const cfg = self.ritualConfig();
+      card.innerHTML = `
+        <h3 class="card-title">${icon('list-check')} Pre-Focus Ritual</h3>
+        <p class="muted small">Before every fresh focus start (stopwatch, pomodoro, one-tap resume) a popup shows this checklist — Start unlocks only when every item is ticked.</p>
+        <label class="subs-check" style="padding-bottom:6px">
+          <input type="checkbox" id="ritual-enabled" ${cfg.enabled ? 'checked' : ''}>
+          Show the ritual popup before every focus start
+        </label>
+        <div id="ritual-items">
+          ${cfg.items.length ? cfg.items.map(it => `
+            <div class="sub-row">
+              <b class="sub-label">${Utils.esc(it.text)}</b>
+              <button class="btn btn-icon btn-ghost danger" data-ritual-del="${Utils.esc(it.id)}" title="Remove">${icon('xmark')}</button>
+            </div>`).join('')
+          : '<p class="muted small">No items — the popup is skipped until you add one below.</p>'}
+        </div>
+        <div class="subs-add">
+          <input id="ritual-new" placeholder="e.g. Phone on silent, in another room" maxlength="80">
+          <button class="btn btn-primary btn-sm" id="ritual-add-btn">${icon('plus')} Add</button>
+        </div>`;
+
+      /* add — non-empty, no exact duplicates */
+      const add = async () => {
+        const text = qs('#ritual-new', card).value.trim();
+        if (!text) return toast('Type the distraction to clear first.', 'warn');
+        const cfg2 = self.ritualConfig();
+        if (cfg2.items.some(it => it.text.toLowerCase() === text.toLowerCase())) {
+          return toast('That item is already on the list.', 'warn');
+        }
+        cfg2.items.push({ id: Utils.uid(), text: text.slice(0, 80) });
+        try {
+          await self.ritualSave(cfg2);
+          toast('🧘 Ritual item added.', 'success');
+          renderCard();
+        } catch (e) { App.handleError(e); }
+      };
+      qs('#ritual-add-btn', card).addEventListener('click', add);
+      qs('#ritual-new', card).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+
+      /* delete — listeners live on the per-render list, never on container */
+      qs('#ritual-items', card).addEventListener('click', async e => {
+        const del = e.target.closest('[data-ritual-del]');
+        if (!del) return;
+        const cfg2 = self.ritualConfig();
+        cfg2.items = cfg2.items.filter(it => it.id !== del.dataset.ritualDel);
+        try {
+          await self.ritualSave(cfg2);
+          toast('Ritual item removed.', 'info');
+          renderCard();
+        } catch (err) { App.handleError(err); }
+      });
+
+      /* toggle — saved the moment it changes */
+      qs('#ritual-enabled', card).addEventListener('change', async () => {
+        const cfg2 = self.ritualConfig();
+        cfg2.enabled = qs('#ritual-enabled', card).checked;
+        try {
+          await self.ritualSave(cfg2);
+          toast(cfg2.enabled ? '🧘 Ritual is ON — it greets your next focus start.' : 'Ritual is OFF — focus starts without the popup.', 'info');
+        } catch (err) { App.handleError(err); }
+      });
+    };
+    renderCard();
+  },
+
   /* ================= ticker ================= */
 
   tick() {
@@ -580,12 +739,11 @@ const Focus = {
         if (act === 'start') {
           // a picked task supplies its own category + goal — the (hidden) dropdowns are only a fallback
           const st = (App.state.tasks || []).find(x => x.id === qs('#focus-task', container).value);
-          this.start(
-            qs('#focus-mode', container).value,
-            (st && st.category) || qs('#focus-category', container).value,
-            qs('#focus-task', container).value,
-            (st && st.goal_id) || qs('#focus-goal', container).value
-          );
+          const mode = qs('#focus-mode', container).value;
+          const category = (st && st.category) || qs('#focus-category', container).value;
+          const taskId = qs('#focus-task', container).value;
+          const goalId = (st && st.goal_id) || qs('#focus-goal', container).value;
+          this.ritualGate(() => this.start(mode, category, taskId, goalId)); // pre-focus ritual (v2.14.0)
         }
         if (act === 'pause') this.pause();
         if (act === 'resume') this.resume();
@@ -822,13 +980,12 @@ const Focus = {
       Utils.pref('pomoBreakMin', Utils.clamp(Utils.num(qs('#pomo-break-min', container).value) || 5, 1, 60));
       // a picked task supplies its own category + goal — the (hidden) dropdowns are only a fallback
       const pt = (App.state.tasks || []).find(x => x.id === qs('#pomo-task', container).value);
-      this.startPomo(
-        Utils.num(qs('#pomo-focus-min', container).value) || 25,
-        Utils.num(qs('#pomo-break-min', container).value) || 5,
-        qs('#pomo-task', container).value,
-        (pt && pt.category) || qs('#pomo-category', container).value,
-        (pt && pt.goal_id) || qs('#pomo-goal', container).value
-      );
+      const fv = Utils.num(qs('#pomo-focus-min', container).value) || 25;
+      const bv = Utils.num(qs('#pomo-break-min', container).value) || 5;
+      const taskId = qs('#pomo-task', container).value;
+      const category = (pt && pt.category) || qs('#pomo-category', container).value;
+      const goalId = (pt && pt.goal_id) || qs('#pomo-goal', container).value;
+      this.ritualGate(() => this.startPomo(fv, bv, taskId, category, goalId)); // pre-focus ritual (v2.14.0)
     }
     if (act === 'pause') this.pomoPause();
     if (act === 'resume') this.pomoResume();

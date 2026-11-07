@@ -109,6 +109,9 @@ const Settings = {
         <!-- Subscriptions (fixed-date countdown) -->
         <div class="card" id="subs-card"></div>
 
+        <!-- Pre-Focus Ritual (v2.14.0) -->
+        <div class="card" id="ritual-card"></div>
+
         <!-- Auto-progress (v2.13.0) -->
         <div class="card">
           <h3 class="card-title">${icon('arrows-rotate')} Auto progress</h3>
@@ -399,6 +402,9 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
 
     /* --- subscriptions (fixed-date countdown) --- */
     if (typeof Subs !== 'undefined' && Subs.settingsCard) Subs.settingsCard(container);
+
+    /* --- pre-focus ritual (v2.14.0) --- */
+    if (typeof Focus !== 'undefined' && Focus.ritualSettingsCard) Focus.ritualSettingsCard(container);
 
     // PWA install hint
     const pwa = qs('#pwa-hint', container);
