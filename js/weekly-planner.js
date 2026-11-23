@@ -9,6 +9,9 @@ const WeeklyPlanner = {
   prefix: 'weekly_plan.v1.',
   selectedWeek: null,
   dayTab: 'All',
+  view: 'list',
+  calY: null,
+  calM: null,
   busy: new Set(),
 
   validDate(date) {
@@ -235,6 +238,95 @@ const WeeklyPlanner = {
       ${invalid.length ? '<p class="banner banner-warn">Some weekly plans could not be read. Sync or restore a valid backup.</p>' : ''}
       ${entries.length ? entries.map(e => this.sessionRow(e)).join('') : `<p class="muted">No weekly sessions today. <a class="link" href="#/routines">Choose days for this week</a>.</p>`}</div>`;
   },
+  /** Month grid for the calendar view — Monday-based, same layout as the
+      Tasks calendar. Pure (testable); dates are local naive strings. */
+  monthDates(y, m) {
+    const startDow = (new Date(y, m, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const out = [];
+    for (let i = 0; i < startDow; i++) out.push(null);
+    for (let d = 1; d <= daysInMonth; d++) out.push(`${y}-${Utils.pad(m + 1)}-${Utils.pad(d)}`);
+    return out;
+  },
+  setView(view) {
+    if (!['list', 'month', 'week'].includes(view)) return;
+    this.view = view;
+    if (view === 'month' && this.calY === null) {
+      const d = Utils.parseDate(Utils.today());
+      this.calY = d.getFullYear(); this.calM = d.getMonth();
+    }
+    App.refreshCurrent();
+  },
+  calNav(dir) {
+    const d = Utils.parseDate(Utils.today());
+    if (dir === 'today') { this.calY = d.getFullYear(); this.calM = d.getMonth(); }
+    else if (dir === 'prev') { this.calM--; if (this.calM < 0) { this.calM = 11; this.calY--; } }
+    else if (dir === 'next') { this.calM++; if (this.calM > 11) { this.calM = 0; this.calY++; } }
+    App.refreshCurrent();
+  },
+  monthCalendarHtml(today = Utils.today()) {
+    if (this.calY === null) { const d = Utils.parseDate(today); this.calY = d.getFullYear(); this.calM = d.getMonth(); }
+    const first = new Date(this.calY, this.calM, 1);
+    const monthName = first.toLocaleString('en-us', { month: 'long' });
+    const colors = { done: '#10b981', late: '#10b981', missed: '#ef4444', pending: '#f59e0b', upcoming: '#64748b' };
+    const cells = this.monthDates(this.calY, this.calM).map(date => {
+      if (!date) return '<div class="wp-cal-cell blank"></div>';
+      const entries = this.sessionsOn(date);
+      const dots = entries.slice(0, 3).map(e => `<span class="wp-dot" style="background:${colors[e.status]}" title="${Utils.esc(e.title + ' — ' + e.status)}"></span>`).join('');
+      const more = entries.length > 3 ? `<span class="wp-more">+${entries.length - 3}</span>` : '';
+      return `<button type="button" class="wp-cal-cell${date === today ? ' today' : ''}${entries.length ? ' has-items' : ''}" data-wp-action="open-day" data-wp-date="${date}" aria-label="${Utils.esc(Utils.fmtDay(date) + (entries.length ? ' — ' + entries.length + ' session' + (entries.length > 1 ? 's' : '') : ''))}">
+        <span class="wp-cal-num">${Number(date.slice(8))}</span>
+        <span class="wp-cal-dots">${dots}${more}</span>
+      </button>`;
+    }).join('');
+    return `<div class="card wp-cal">
+      <div class="cal-head wp-cal-head">
+        <button class="btn btn-icon btn-ghost" data-wp-action="cal-nav" data-wp-dir="prev" aria-label="Previous month">${icon('chevron-left')}</button>
+        <b>${monthName} ${this.calY}</b>
+        <button class="btn btn-icon btn-ghost" data-wp-action="cal-nav" data-wp-dir="next" aria-label="Next month">${icon('chevron-right')}</button>
+        <button class="btn btn-ghost btn-sm" data-wp-action="cal-nav" data-wp-dir="today">Today</button>
+      </div>
+      <div class="wp-cal-weekdays" aria-hidden="true">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => `<span>${w}</span>`).join('')}</div>
+      <div class="wp-cal-grid">${cells}</div>
+      <p class="muted small">Tap a day to see its weekly sessions · green done · amber pending · red missed · grey upcoming.</p>
+    </div>`;
+  },
+  weekGridHtml(today = Utils.today()) {
+    const cols = this.dates().map(date => {
+      const entries = this.sessionsOn(date);
+      return `<div class="wp-week-col${date === today ? ' today' : ''}">
+        <div class="wp-week-head"><b>${Utils.weekdayShort(date)}</b><span class="muted small">${date.slice(5)}</span>${date === today ? chip('Today', 'var(--c-primary)') : ''}</div>
+        <div class="wp-week-body">${entries.length ? entries.map(e => this.sessionRow(e)).join('') : '<p class="muted small wp-empty">—</p>'}</div>
+      </div>`;
+    }).join('');
+    return `<div class="wp-week-grid">${cols}</div>
+      <p class="muted small">Seven days of the selected week · check a session from its day, never before.</p>`;
+  },
+  openDay(date) {
+    const entries = this.sessionsOn(date);
+    const m = openModal({
+      title: icon('calendar-days') + ' ' + Utils.fmtDay(date),
+      body: `<div class="stack">
+          <div class="section-subhead">Weekly sessions (${entries.length})</div>
+          ${entries.length ? entries.map(e => this.sessionRow(e)).join('') : `<p class="muted small">No sessions on this day.</p>`}
+          <p class="muted small">Sessions do not complete Tasks.</p>
+        </div>`,
+      footer: `<button class="btn btn-ghost" data-close>Close</button><button class="btn btn-primary" data-week>${this.weekStart(date) === this.weekStart() ? 'Open planner view' : 'Open that week'}</button>`
+    });
+    qs('[data-close]', m.overlay).addEventListener('click', m.close);
+    qs('[data-week]', m.overlay).addEventListener('click', () => { m.close(); this.view = 'week'; this.goWeek(this.weekStart(date)); });
+    m.overlay.addEventListener('click', e => {
+      const btn = e.target.closest('[data-wp-action]');
+      if (!btn || btn.disabled) return;
+      if (btn.dataset.wpAction === 'session') { m.close(); this.openSession(btn.dataset.wpKey, btn.dataset.wpSession); }
+      else if (btn.dataset.wpAction === 'toggle') {
+        btn.disabled = true;
+        this.toggle(btn.dataset.wpKey, btn.dataset.wpSession)
+          .then(() => { m.close(); toast('Weekly session saved — original Task unchanged.', 'success'); })
+          .catch(err => { btn.disabled = false; App.handleError(err); });
+      }
+    });
+  },
   legacyHtml() {
     const routines = App.state.routines || [];
     if (!routines.length) return '';
@@ -257,9 +349,11 @@ const WeeklyPlanner = {
         <div class="wp-actions"><button class="btn btn-sm" data-wp-action="current">This week</button><label class="wp-week-select"><span class="muted small">Week / history</span><select id="wp-week-select" aria-label="Week history">${weeks.map(w => `<option value="${w}" ${w === week ? 'selected' : ''}>${Utils.fmtDate(w)} – ${Utils.fmtDate(Utils.addDays(w, 6))}</option>`).join('')}</select></label></div></div>
       ${invalid.length ? `<div class="banner banner-warn" role="alert">${invalid.length} saved weekly plan(s) could not be read. They have NOT been deleted or replaced. Sync, or restore a valid backup in Settings.</div>` : ''}
       <div class="wp-summary"><div class="card"><b>${counts.done}/${counts.total}</b><span>sessions done</span></div><div class="card"><b>${counts.missed}</b><span>missed</span></div><div class="card"><b>${counts.pending}</b><span>pending today</span></div><div class="card"><b>${counts.upcoming}</b><span>upcoming</span></div></div>
+      <div class="wp-view-seg" role="group" aria-label="Planner view"><button class="${this.view === 'list' ? 'on' : ''}" data-wp-action="view" data-wp-view="list">${icon('list')} List</button><button class="${this.view === 'month' ? 'on' : ''}" data-wp-action="view" data-wp-view="month">${icon('calendar-days')} Calendar</button><button class="${this.view === 'week' ? 'on' : ''}" data-wp-action="view" data-wp-view="week">${icon('table-columns')} Week</button></div>
       <p class="muted small wp-explainer">Only selected days count. A session check never completes the original Task. New Fridays do not copy unfinished sessions.</p>
+      ${this.view === 'month' ? this.monthCalendarHtml() : this.view === 'week' ? this.weekGridHtml() : `
       <div class="wp-tabs" role="group" aria-label="Filter by day"><button class="tab ${this.dayTab === 'All' ? 'active' : ''}" data-wp-action="day" data-wp-date="All">All days</button>${this.dates(week).map(date => `<button class="tab ${this.dayTab === date ? 'active' : ''}${date === today ? ' wp-is-today' : ''}" data-wp-action="day" data-wp-date="${date}">${Utils.weekdayShort(date)} <span>${date.slice(8)}</span></button>`).join('')}</div>
-      <div class="stack wp-list">${filtered.length ? (this.dayTab === 'All' ? filtered.map(a => this.assignmentHtml(a)).join('') : this.sessionsOn(this.dayTab).map(e => this.sessionRow(e)).join('')) : emptyState('calendar-days', assignments.length ? 'No sessions on this day' : 'No tasks planned for this week', week < current ? 'This week has no saved plan.' : 'Choose an existing task and the days you want to work on it. Nothing repeats automatically.', Utils.addDays(week, 6) >= today ? '<button class="btn btn-primary" data-wp-action="add">Add to week</button>' : '')}</div>
+      <div class="stack wp-list">${filtered.length ? (this.dayTab === 'All' ? filtered.map(a => this.assignmentHtml(a)).join('') : this.sessionsOn(this.dayTab).map(e => this.sessionRow(e)).join('')) : emptyState('calendar-days', assignments.length ? 'No sessions on this day' : 'No tasks planned for this week', week < current ? 'This week has no saved plan.' : 'Choose an existing task and the days you want to work on it. Nothing repeats automatically.', Utils.addDays(week, 6) >= today ? '<button class="btn btn-primary" data-wp-action="add">Add to week</button>' : '')}</div>`}
       ${this.legacyHtml()}`;
     container.onclick = e => this.handleClick(e);
     qs('#wp-week-select', container).addEventListener('change', e => this.goWeek(e.target.value));
@@ -277,6 +371,9 @@ const WeeklyPlanner = {
     else if (action === 'forward') this.goWeek(Utils.addDays(this.week(), 7));
     else if (action === 'current') this.goWeek(this.weekStart());
     else if (action === 'day') { this.dayTab = btn.dataset.wpDate; App.refreshCurrent(); }
+    else if (action === 'view') return this.setView(btn.dataset.wpView);
+    else if (action === 'cal-nav') return this.calNav(btn.dataset.wpDir);
+    else if (action === 'open-day') return this.openDay(btn.dataset.wpDate);
     else if (action === 'new-task') Tasks.openForm();
     else if (action === 'add' || action === 'next') {
       try {

@@ -266,6 +266,30 @@ await test('Legacy routine rendering read-only', () => {
   assert.match(html, /read-only/); assert.ok(!html.includes('data-routine-action'));
 });
 
+await test('Month calendar marks session days with dots and day links', () => {
+  const html = planner.monthCalendarHtml('2026-11-27');
+  assert.ok(html.includes('data-wp-action="open-day"'));
+  assert.ok(html.includes('wp-cal-cell today'));
+  assert.ok(html.includes('wp-dot'));
+  assert.equal(planner.monthDates(2026, 10).filter(d => d === null).length, 6); // Nov 2026 starts Sunday
+  assert.equal(planner.monthDates(2028, 1).filter(Boolean).length, 29); // leap February
+  assert.equal(planner.monthDates(2026, 1).filter(Boolean).length, 28);
+});
+await test('Week grid shows seven columns; Done only from its own day', () => {
+  const html = planner.weekGridHtml('2026-11-27');
+  assert.equal((html.match(/class="wp-week-col/g) || []).length, 7);
+  assert.ok(html.includes('wp-week-col today'));
+  assert.equal((html.match(/data-wp-action="toggle"/g) || []).length, 1); // only today's HTB session
+});
+await test('View switching validates input and initializes calendar month', () => {
+  planner.setView('month');
+  assert.equal(planner.view, 'month');
+  assert.notEqual(planner.calY, null);
+  planner.setView('bogus');
+  assert.equal(planner.view, 'month');
+  planner.setView('list');
+});
+
 const failed = checks.filter(c => !c.pass);
 console.log(`\nWEEKLY PLANNER: ${checks.length - failed.length}/${checks.length} scenarios passed`);
 process.exitCode = failed.length ? 1 : 0;

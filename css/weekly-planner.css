@@ -71,6 +71,99 @@
   .wp-progress { font-size: 18px; }
   .wp-pick-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+/* Planner views — month calendar + week grid */
+.wp-view-seg {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto 16px;
+  padding: 4px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.wp-view-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.wp-view-seg button.on { background: var(--c-primary); color: var(--on-primary); }
+.wp-view-seg button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.wp-cal-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; margin-bottom: 12px; }
+.wp-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.wp-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.wp-cal-cell {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  align-content: start;
+  min-height: 64px;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.wp-cal-cell.blank { border: 0; background: transparent; cursor: default; }
+.wp-cal-cell.has-items { border-color: color-mix(in srgb, var(--c-primary) 45%, var(--border)); }
+.wp-cal-cell.today { box-shadow: 0 0 0 2px var(--c-primary); }
+.wp-cal-cell:not(.blank):hover { transform: translateY(-2px); }
+.wp-cal-cell:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.wp-cal-num { font-weight: 700; font-size: 13px; }
+.wp-cal-dots { display: flex; gap: 4px; align-items: center; min-height: 10px; flex-wrap: wrap; justify-content: center; }
+.wp-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.wp-more { font-size: 10px; color: var(--text-muted); }
+.wp-week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.wp-week-col {
+  display: grid;
+  gap: 10px;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+.wp-week-col.today { border-color: var(--c-primary); box-shadow: 0 0 0 1px var(--c-primary); }
+.wp-week-head { display: grid; gap: 3px; justify-items: center; }
+.wp-week-body { display: grid; gap: 8px; }
+.wp-week-col .wp-session-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.wp-week-col .wp-session-row:last-child { border-bottom: 1px solid var(--border); }
+.wp-week-col .wp-empty { text-align: center; margin: 0; }
+@media (max-width: 900px) {
+  .wp-week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .wp-week-grid { grid-template-columns: 1fr; }
+  .wp-cal-cell { min-height: 52px; padding: 6px 2px; gap: 4px; }
+  .wp-cal-num { font-size: 11px; }
+  .wp-view-seg button { padding: 6px 10px; font-size: 12px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .wp-day:not(:disabled):hover { transform: none; }
+  .wp-day:not(:disabled):hover, .wp-cal-cell:not(.blank):hover { transform: none; }
 }
