@@ -11,8 +11,6 @@
 .wp-task-main h3 { margin: 0 0 6px; }
 .wp-toolbar { flex-wrap: wrap; margin-bottom: 16px; }
 .wp-week-nav > div { display: grid; gap: 4px; }
-.wp-week-select { display: grid; gap: 4px; }
-.wp-week-select select { max-width: 100%; }
 .wp-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .wp-summary .card { display: grid; gap: 5px; }
 .wp-summary b { font-size: 24px; }
@@ -63,8 +61,6 @@
   .wp-toolbar { align-items: stretch; }
   .wp-week-nav { width: 100%; justify-content: space-between; gap: 5px; }
   .wp-week-nav > div { text-align: center; font-size: 13px; }
-  .wp-week-select { flex: 1; min-width: 0; }
-  .wp-toolbar > .wp-actions { width: 100%; }
   .wp-days { gap: 4px; }
   .wp-day { padding: 9px 1px; }
   .wp-day > span { font-size: 11px; }

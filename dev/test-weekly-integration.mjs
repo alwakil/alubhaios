@@ -222,10 +222,10 @@ await test('shell route, midnight refresh and legacy reminder no-op', async () =
 });
 await test('planner assets are versioned and cached with dependency ordering', async () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8'), sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(html.includes('css/weekly-planner.css?v=2.16.0')); assert.ok(html.includes('js/weekly-planner.js?v=2.16.0'));
+  assert.ok(html.includes('css/weekly-planner.css?v=2.17.0')); assert.ok(html.includes('js/weekly-planner.js?v=2.17.0'));
   assert.ok(html.indexOf('js/weekly-planner.js') > html.indexOf('js/routines.js'));
   assert.ok(html.indexOf('js/weekly-planner.js') > html.indexOf('js/tasks.js'));
   assert.ok(html.indexOf('js/weekly-planner.js') < html.indexOf('js/app.js'));
-  assert.ok(sw.includes("'js/weekly-planner.js'")); assert.ok(sw.includes("'css/weekly-planner.css'")); assert.ok(sw.includes('alubhaios-v2.16.0'));
+  assert.ok(sw.includes("'js/weekly-planner.js'")); assert.ok(sw.includes("'css/weekly-planner.css'")); assert.ok(sw.includes('alubhaios-v2.17.0'));
 });
 console.log(`Weekly integration: ${pass} tests passed (synthetic fetches only).`);

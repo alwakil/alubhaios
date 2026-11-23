@@ -290,6 +290,24 @@ await test('View switching validates input and initializes calendar month', () =
   planner.setView('list');
 });
 
+await test('Session rows drop the redundant explanation line', () => {
+  const row = planner.sessionRow({ assignment: { key: 'k', title: 'HTB <b>Lab' }, session: { id: 's1', date: '2026-11-21', done_at: '', cancelled_at: '', moves: [] }, title: 'HTB <b>Lab', status: 'pending' });
+  assert.ok(row.includes('Details'));
+  assert.ok(!row.includes('not Task completion'));
+});
+await test('PNG export data builds 7 columns, labels and filename', () => {
+  const data = planner.weekExportData('2026-11-20', '2026-11-23');
+  assert.equal(data.columns.length, 7);
+  assert.equal(data.filename, 'weekly-plan-2026-11-20.png');
+  assert.equal(data.columns[3].day, 'Mon');
+  assert.ok(data.columns[3].isToday);
+  const sess = data.columns[3].sessions[0];
+  assert.equal(sess.statusLabel, 'Pending');
+  assert.equal(sess.color, '#f59e0b');
+  assert.equal(data.columns[0].sessions.length, 0);
+  assert.ok(data.rangeLabel.includes('–'));
+});
+
 const failed = checks.filter(c => !c.pass);
 console.log(`\nWEEKLY PLANNER: ${checks.length - failed.length}/${checks.length} scenarios passed`);
 process.exitCode = failed.length ? 1 : 0;

@@ -97,10 +97,10 @@ const WeeklyPlanner = {
     }));
     return counts;
   },
-  sessionsOn(date) {
+  sessionsOn(date, today = Utils.today()) {
     return this.assignments(this.weekStart(date)).flatMap(assignment => assignment.sessions
       .filter(s => s.date === date && !s.cancelled_at)
-      .map(session => ({ assignment, session, title: assignment.title, status: this.status(session) })));
+      .map(session => ({ assignment, session, title: assignment.title, status: this.status(session, today) })));
   },
 
   /** Compare-and-set writes prevent another device's session update being lost. */
@@ -187,11 +187,13 @@ const WeeklyPlanner = {
     return count;
   },
 
-  statusChip(status) {
-    const names = { done: 'Done', late: 'Done · late', missed: 'Missed', pending: 'Pending', upcoming: 'Upcoming', cancelled: 'Removed' };
-    const colors = { done: '#10b981', late: '#10b981', missed: '#ef4444', pending: '#f59e0b', upcoming: '#64748b', cancelled: '#64748b' };
-    return chip(names[status], colors[status]);
+  statusName(status) {
+    return { done: 'Done', late: 'Done · late', missed: 'Missed', pending: 'Pending', upcoming: 'Upcoming', cancelled: 'Removed' }[status] || status;
   },
+  statusColor(status) {
+    return { done: '#10b981', late: '#10b981', missed: '#ef4444', pending: '#f59e0b', upcoming: '#64748b', cancelled: '#64748b' }[status] || '#64748b';
+  },
+  statusChip(status) { return chip(this.statusName(status), this.statusColor(status)); },
   button(action, key, sessionId, label, extra = '') {
     return `<button type="button" class="btn btn-sm ${extra}" data-wp-action="${action}" data-wp-key="${Utils.esc(key)}" data-wp-session="${Utils.esc(sessionId || '')}" ${this.busy.has(key) ? 'disabled' : ''}>${label}</button>`;
   },
@@ -229,7 +231,7 @@ const WeeklyPlanner = {
   },
   sessionRow(entry) {
     const { assignment: a, session: s, status } = entry;
-    return `<div class="wp-session-row"><div class="wp-task-main"><b>${Utils.esc(a.title)}</b><div class="task-meta">${this.statusChip(status)}<span class="muted small">Weekly session · not Task completion</span></div></div>
+    return `<div class="wp-session-row"><div class="wp-task-main"><b>${Utils.esc(a.title)}</b><div class="task-meta">${this.statusChip(status)}</div></div>
       <div class="wp-actions">${this.button('session', a.key, s.id, 'Details')}${s.date <= Utils.today() ? this.button('toggle', a.key, s.id, s.done_at ? 'Undo' : 'Done', s.done_at ? '' : 'btn-success') : ''}</div></div>`;
   },
   todayHtml(date = Utils.today()) {
@@ -237,6 +239,90 @@ const WeeklyPlanner = {
     return `<div class="wp-today"><p class="muted small">Day sessions are separate from your original Tasks. <a class="link" href="#/routines">Open weekly plan</a></p>
       ${invalid.length ? '<p class="banner banner-warn">Some weekly plans could not be read. Sync or restore a valid backup.</p>' : ''}
       ${entries.length ? entries.map(e => this.sessionRow(e)).join('') : `<p class="muted">No weekly sessions today. <a class="link" href="#/routines">Choose days for this week</a>.</p>`}</div>`;
+  },
+  /** Structured week data for the PNG export — pure (testable). */
+  weekExportData(week = this.week(), today = Utils.today()) {
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const counts = this.summary(this.assignments(week), today);
+    return {
+      filename: 'weekly-plan-' + week + '.png',
+      rangeLabel: Utils.fmtDay(week) + ' – ' + Utils.fmtDay(Utils.addDays(week, 6)),
+      done: counts.done, total: counts.total, missed: counts.missed,
+      columns: this.dates(week).map(date => {
+        const d = Utils.parseDate(date);
+        return {
+          date, day: Utils.weekdayShort(date),
+          dateLabel: d.getDate() + ' ' + MONTHS[d.getMonth()],
+          isToday: date === today,
+          sessions: this.sessionsOn(date, today).map(e => ({
+            title: e.title, status: e.status,
+            statusLabel: this.statusName(e.status), color: this.statusColor(e.status)
+          }))
+        };
+      })
+    };
+  },
+  /** Draw the selected week on an offscreen canvas at 2× scale and download it. */
+  async exportPng(week = this.week()) {
+    const data = this.weekExportData(week);
+    const S = 2, W = 1480, pad = 48, gap = 14, headH = 132, colHead = 64, card = 118, colPad = 14, foot = 64;
+    const rows = Math.max(1, ...data.columns.map(c => c.sessions.length));
+    const colW = (W - pad * 2 - gap * 6) / 7, colH = colHead + rows * card + colPad;
+    const H = headH + colH + foot;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(W * S); canvas.height = Math.round(H * S);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(S, S);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#0f172a'; ctx.font = '700 34px Inter, system-ui, sans-serif';
+    ctx.fillText('Weekly Planner', pad, 60);
+    ctx.fillStyle = '#64748b'; ctx.font = '500 19px Inter, system-ui, sans-serif';
+    ctx.fillText(data.rangeLabel + ' · Friday → Thursday', pad, 90);
+    ctx.textAlign = 'right';
+    ctx.font = '700 22px Inter, system-ui, sans-serif'; ctx.fillStyle = '#0f172a';
+    ctx.fillText(data.done + '/' + data.total + ' sessions done', W - pad, 60);
+    ctx.font = '500 17px Inter, system-ui, sans-serif'; ctx.fillStyle = data.missed ? '#ef4444' : '#64748b';
+    ctx.fillText(data.missed + ' missed', W - pad, 88);
+    ctx.textAlign = 'left';
+    data.columns.forEach((col, i) => {
+      const x = pad + i * (colW + gap), y = headH;
+      ctx.fillStyle = '#f1f5f9'; roundRectPath(ctx, x, y, colW, colH, 14); ctx.fill();
+      ctx.textAlign = 'center';
+      ctx.fillStyle = col.isToday ? '#4f46e5' : '#0f172a';
+      ctx.font = '700 20px Inter, system-ui, sans-serif';
+      ctx.fillText(col.day, x + colW / 2, y + 30);
+      ctx.fillStyle = '#64748b'; ctx.font = '500 15px Inter, system-ui, sans-serif';
+      ctx.fillText(col.dateLabel, x + colW / 2, y + 52);
+      if (!col.sessions.length) {
+        ctx.fillStyle = '#94a3b8'; ctx.font = '500 15px Inter, system-ui, sans-serif';
+        ctx.fillText('—', x + colW / 2, y + colHead + 26);
+      }
+      col.sessions.forEach((s, j) => {
+        const cy = y + colHead + j * card;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = (s.status === 'done' || s.status === 'late') ? '#10b981' : s.status === 'missed' ? '#fca5a5' : '#e2e8f0';
+        ctx.fillStyle = '#ffffff'; roundRectPath(ctx, x + 10, cy + 6, colW - 20, card - 18, 10); ctx.fill(); ctx.stroke();
+        ctx.textAlign = 'left'; ctx.fillStyle = '#0f172a';
+        ctx.font = '600 16px Inter, system-ui, sans-serif';
+        wpWrap(ctx, s.title, x + 22, cy + 28, colW - 44, 20, 2);
+        wpChip(ctx, s.statusLabel, s.color, x + 22, cy + card - 40);
+        if (s.status === 'done' || s.status === 'late') {
+          ctx.fillStyle = '#10b981'; ctx.font = '700 18px Inter, system-ui, sans-serif'; ctx.textAlign = 'right';
+          ctx.fillText('✓', x + colW - 22, cy + card - 24); ctx.textAlign = 'left';
+        }
+      });
+      ctx.textAlign = 'left';
+    });
+    ctx.fillStyle = '#94a3b8'; ctx.font = '500 14px Inter, system-ui, sans-serif';
+    ctx.fillText('Session Done ≠ original Task Done · ' + CONFIG.APP_NAME, pad, H - 26);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Could not render the weekly plan image.');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = data.filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    toast('📅 Weekly plan PNG downloaded.', 'success');
   },
   /** Month grid for the calendar view — Monday-based, same layout as the
       Tasks calendar. Pure (testable); dates are local naive strings. */
@@ -338,15 +424,13 @@ const WeeklyPlanner = {
   page(container) {
     const week = this.week(), current = this.weekStart(), today = Utils.today();
     if (this.dayTab !== 'All' && !this.dates(week).includes(this.dayTab)) this.dayTab = 'All';
-    const assignments = this.assignments(week), counts = this.summary(assignments), { plans, invalid } = this.records();
+    const assignments = this.assignments(week), counts = this.summary(assignments), { invalid } = this.records();
     const label = week === current ? 'This week' : week < current ? 'Past week' : 'Future week';
     const filtered = this.dayTab === 'All' ? assignments : assignments.filter(a =>
       a.sessions.some(s => !s.cancelled_at && s.date === this.dayTab));
-    const weeks = [...new Set([week, current, Utils.addDays(current, 7), ...plans.map(a => a.week_start)])].sort().reverse();
     container.innerHTML = `<div class="page-head"><div><h2>Weekly Planner</h2><p class="muted small">Friday → Thursday · your tasks, your days</p></div>
-      <div class="wp-actions"><button class="btn" data-wp-action="new-task">${icon('plus')} New task</button><button class="btn btn-primary" data-wp-action="add" ${Utils.addDays(week, 6) < today ? 'disabled' : ''}>${icon('calendar-plus')} Add to week</button></div></div>
-      <div class="card wp-toolbar"><div class="wp-week-nav"><button class="btn btn-icon btn-ghost" data-wp-action="prev" aria-label="Previous week">${icon('chevron-left')}</button><div><b>${Utils.fmtDate(week)} – ${Utils.fmtDate(Utils.addDays(week, 6))}</b><span class="muted small">${label}</span></div><button class="btn btn-icon btn-ghost" data-wp-action="forward" aria-label="Next week">${icon('chevron-right')}</button></div>
-        <div class="wp-actions"><button class="btn btn-sm" data-wp-action="current">This week</button><label class="wp-week-select"><span class="muted small">Week / history</span><select id="wp-week-select" aria-label="Week history">${weeks.map(w => `<option value="${w}" ${w === week ? 'selected' : ''}>${Utils.fmtDate(w)} – ${Utils.fmtDate(Utils.addDays(w, 6))}</option>`).join('')}</select></label></div></div>
+      <div class="wp-actions"><button class="btn" data-wp-action="new-task">${icon('plus')} New task</button><button class="btn" data-wp-action="png" title="Download this week as a high-quality PNG image">${icon('image')} PNG</button><button class="btn btn-primary" data-wp-action="add" ${Utils.addDays(week, 6) < today ? 'disabled' : ''}>${icon('calendar-plus')} Add to week</button></div></div>
+      <div class="card wp-toolbar"><div class="wp-week-nav"><button class="btn btn-icon btn-ghost" data-wp-action="prev" aria-label="Previous week">${icon('chevron-left')}</button><div><b>${Utils.fmtDate(week)} – ${Utils.fmtDate(Utils.addDays(week, 6))}</b><span class="muted small">${label}</span></div><button class="btn btn-icon btn-ghost" data-wp-action="forward" aria-label="Next week">${icon('chevron-right')}</button></div></div>
       ${invalid.length ? `<div class="banner banner-warn" role="alert">${invalid.length} saved weekly plan(s) could not be read. They have NOT been deleted or replaced. Sync, or restore a valid backup in Settings.</div>` : ''}
       <div class="wp-summary"><div class="card"><b>${counts.done}/${counts.total}</b><span>sessions done</span></div><div class="card"><b>${counts.missed}</b><span>missed</span></div><div class="card"><b>${counts.pending}</b><span>pending today</span></div><div class="card"><b>${counts.upcoming}</b><span>upcoming</span></div></div>
       <div class="wp-view-seg" role="group" aria-label="Planner view"><button class="${this.view === 'list' ? 'on' : ''}" data-wp-action="view" data-wp-view="list">${icon('list')} List</button><button class="${this.view === 'month' ? 'on' : ''}" data-wp-action="view" data-wp-view="month">${icon('calendar-days')} Calendar</button><button class="${this.view === 'week' ? 'on' : ''}" data-wp-action="view" data-wp-view="week">${icon('table-columns')} Week</button></div>
@@ -356,7 +440,6 @@ const WeeklyPlanner = {
       <div class="stack wp-list">${filtered.length ? (this.dayTab === 'All' ? filtered.map(a => this.assignmentHtml(a)).join('') : this.sessionsOn(this.dayTab).map(e => this.sessionRow(e)).join('')) : emptyState('calendar-days', assignments.length ? 'No sessions on this day' : 'No tasks planned for this week', week < current ? 'This week has no saved plan.' : 'Choose an existing task and the days you want to work on it. Nothing repeats automatically.', Utils.addDays(week, 6) >= today ? '<button class="btn btn-primary" data-wp-action="add">Add to week</button>' : '')}</div>`}
       ${this.legacyHtml()}`;
     container.onclick = e => this.handleClick(e);
-    qs('#wp-week-select', container).addEventListener('change', e => this.goWeek(e.target.value));
   },
   goWeek(week) {
     this.selectedWeek = week === this.weekStart() ? null : week;
@@ -369,12 +452,12 @@ const WeeklyPlanner = {
     const action = btn.dataset.wpAction, key = btn.dataset.wpKey, sessionId = btn.dataset.wpSession;
     if (action === 'prev') this.goWeek(Utils.addDays(this.week(), -7));
     else if (action === 'forward') this.goWeek(Utils.addDays(this.week(), 7));
-    else if (action === 'current') this.goWeek(this.weekStart());
     else if (action === 'day') { this.dayTab = btn.dataset.wpDate; App.refreshCurrent(); }
     else if (action === 'view') return this.setView(btn.dataset.wpView);
     else if (action === 'cal-nav') return this.calNav(btn.dataset.wpDir);
     else if (action === 'open-day') return this.openDay(btn.dataset.wpDate);
     else if (action === 'new-task') Tasks.openForm();
+    else if (action === 'png') this.exportPng().catch(e => App.handleError(e));
     else if (action === 'add' || action === 'next') {
       try {
         const a = key ? this.read(key) : null;
@@ -479,3 +562,38 @@ const WeeklyPlanner = {
     });
   }
 };
+
+/* Canvas helpers for the PNG export (browser only). */
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function wpWrap(ctx, text, x, y, maxW, lineH, maxLines) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = []; let line = '', truncated = false;
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (line && ctx.measureText(test).width > maxW) {
+      lines.push(line); line = w;
+      if (lines.length === maxLines) { truncated = true; break; }
+    } else line = test;
+  }
+  if (!truncated && line) lines.push(line);
+  if (truncated && lines.length) {
+    let last = lines[lines.length - 1];
+    while (last.length > 1 && ctx.measureText(last + '…').width > maxW) last = last.slice(0, -1);
+    lines[lines.length - 1] = last + '…';
+  }
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineH));
+}
+function wpChip(ctx, label, color, x, y) {
+  ctx.font = '600 13px Inter, system-ui, sans-serif';
+  const w = Math.ceil(ctx.measureText(label).width) + 20;
+  ctx.fillStyle = color + '26'; roundRectPath(ctx, x, y, w, 22, 11); ctx.fill();
+  ctx.fillStyle = color; ctx.fillText(label, x + 10, y + 15);
+}
