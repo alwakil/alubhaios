@@ -163,3 +163,29 @@
 @media (prefers-reduced-motion: reduce) {
   .wp-day:not(:disabled):hover, .wp-cal-cell:not(.blank):hover { transform: none; }
 }
+
+/* Copy last week + quick day add */
+.wp-week-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wp-week-add:not(:disabled):hover { color: var(--c-primary); border-color: var(--c-primary); }
+.wp-week-add:disabled { opacity: .4; cursor: default; }
+.wp-week-add:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.wp-cal-cell.plannable { border-style: dashed; border-color: color-mix(in srgb, var(--c-primary) 40%, var(--border)); }
+.wp-copy-row.off { opacity: .55; }
+.wp-copy-days { grid-template-columns: repeat(7, minmax(0, 1fr)); margin-top: 10px; }
+@media (max-width: 640px) {
+  .wp-copy-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

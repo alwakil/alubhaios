@@ -324,6 +324,62 @@ const WeeklyPlanner = {
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     toast('📅 Weekly plan PNG downloaded.', 'success');
   },
+  /** One-click weekly setup: map a previous week's plan onto a target week.
+      Pure (testable) — flags past days, already-planned days and dead tasks. */
+  copyPlanData(sourceWeek, targetWeek = Utils.addDays(sourceWeek, 7), today = Utils.today()) {
+    const planned = new Set(this.assignments(targetWeek).flatMap(a => a.sessions.filter(s => !s.cancelled_at).map(s => s.date)));
+    const shift = Math.round((Utils.parseDate(targetWeek) - Utils.parseDate(sourceWeek)) / 86400000);
+    return this.assignments(sourceWeek).map(a => {
+      const task = this.task(a.task_id);
+      const active = !!task && !task._archived && task.status !== 'completed' && task.status !== 'cancelled';
+      return {
+        task_id: a.task_id, title: a.title, active,
+        note: !task ? 'Original task deleted' : task._archived ? 'Task archived' : task.status === 'completed' ? 'Task completed' : task.status === 'cancelled' ? 'Task cancelled' : '',
+        days: a.sessions.filter(s => !s.cancelled_at).map(s => {
+          const date = Utils.addDays(s.date, shift);
+          return { date, past: date < today, taken: planned.has(date) };
+        })
+      };
+    });
+  },
+  /** "Copy last week" modal — editable checklist of the previous week's plan. */
+  openCopy(targetWeek = this.week()) {
+    const today = Utils.today(), src = Utils.addDays(targetWeek, -7);
+    const rows = this.copyPlanData(src, targetWeek, today);
+    if (!rows.length) { toast('The previous week has no plan to copy.', 'info'); return; }
+    const m = openModal({
+      title: icon('copy') + ' Copy last week',
+      body: `<p class="muted small">From <b>${Utils.fmtDate(src)}</b> week into <b>${Utils.fmtDate(targetWeek)} – ${Utils.fmtDate(Utils.addDays(targetWeek, 6))}</b>. Uncheck anything you do not want; past and already-planned days are locked.</p>
+        <div class="stack">${rows.map(r => `
+          <div class="card wp-copy-row${r.active ? '' : ' off'}">
+            <div class="wp-task-main"><b>${Utils.esc(r.title)}</b>${r.note ? `<span class="muted small"> — ${Utils.esc(r.note)}</span>` : ''}</div>
+            <div class="wp-pick-days wp-copy-days">${r.days.map(d => `
+              <label class="wp-pick"><input type="checkbox" name="days" value="${Utils.esc(r.task_id)}|${d.date}" ${!r.active || d.past || d.taken ? 'disabled' : 'checked'}>
+                <span>${Utils.weekdayShort(d.date)}</span><b>${d.date.slice(8)}</b>
+                <small class="wp-pick-note">${d.past ? 'Past' : d.taken ? 'Planned' : 'Copy'}</small></label>`).join('')}</div>
+          </div>`).join('')}</div>
+        <p id="wp-copy-error" class="wp-form-error" role="alert"></p>`,
+      footer: '<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-save>Copy selected days</button>'
+    });
+    qs('[data-cancel]', m.overlay).addEventListener('click', m.close);
+    const save = qs('[data-save]', m.overlay);
+    save.addEventListener('click', async () => {
+      const picks = qsa('[name="days"]', m.overlay).filter(i => i.checked && !i.disabled);
+      const error = qs('#wp-copy-error', m.overlay);
+      if (!picks.length) { error.textContent = 'Select at least one day to copy.'; return; }
+      const byTask = {};
+      picks.forEach(i => { const [tid, date] = i.value.split('|'); (byTask[tid] = byTask[tid] || []).push(date); });
+      save.disabled = true;
+      let added = 0, failed = 0, firstError = '';
+      for (const [tid, dates] of Object.entries(byTask)) {
+        try { await this.add(tid, targetWeek, dates.sort()); added++; }
+        catch (e) { failed++; if (!firstError) firstError = e.message; }
+      }
+      m.close();
+      this.goWeek(targetWeek);
+      toast(`📋 Copied to ${added} task${added !== 1 ? 's' : ''}.` + (failed ? ` ${failed} skipped — ${firstError}` : ''), failed ? 'warn' : 'success');
+    });
+  },
   /** Month grid for the calendar view — Monday-based, same layout as the
       Tasks calendar. Pure (testable); dates are local naive strings. */
   monthDates(y, m) {
@@ -357,10 +413,11 @@ const WeeklyPlanner = {
     const colors = { done: '#10b981', late: '#10b981', missed: '#ef4444', pending: '#f59e0b', upcoming: '#64748b' };
     const cells = this.monthDates(this.calY, this.calM).map(date => {
       if (!date) return '<div class="wp-cal-cell blank"></div>';
-      const entries = this.sessionsOn(date);
+      const entries = this.sessionsOn(date, today);
+      const plannable = !entries.length && date >= today;
       const dots = entries.slice(0, 3).map(e => `<span class="wp-dot" style="background:${colors[e.status]}" title="${Utils.esc(e.title + ' — ' + e.status)}"></span>`).join('');
       const more = entries.length > 3 ? `<span class="wp-more">+${entries.length - 3}</span>` : '';
-      return `<button type="button" class="wp-cal-cell${date === today ? ' today' : ''}${entries.length ? ' has-items' : ''}" data-wp-action="open-day" data-wp-date="${date}" aria-label="${Utils.esc(Utils.fmtDay(date) + (entries.length ? ' — ' + entries.length + ' session' + (entries.length > 1 ? 's' : '') : ''))}">
+      return `<button type="button" class="wp-cal-cell${date === today ? ' today' : ''}${entries.length ? ' has-items' : plannable ? ' plannable' : ''}" data-wp-action="${plannable ? 'add-day' : 'open-day'}" data-wp-date="${date}" aria-label="${Utils.esc(plannable ? 'Plan ' + Utils.fmtDay(date) : Utils.fmtDay(date) + (entries.length ? ' — ' + entries.length + ' session' + (entries.length > 1 ? 's' : '') : ''))}">
         <span class="wp-cal-num">${Number(date.slice(8))}</span>
         <span class="wp-cal-dots">${dots}${more}</span>
       </button>`;
@@ -377,12 +434,13 @@ const WeeklyPlanner = {
       <p class="muted small">Tap a day to see its weekly sessions · green done · amber pending · red missed · grey upcoming.</p>
     </div>`;
   },
-  weekGridHtml(today = Utils.today()) {
-    const cols = this.dates().map(date => {
+  weekGridHtml(week = this.week(), today = Utils.today()) {
+    const cols = this.dates(week).map(date => {
       const entries = this.sessionsOn(date);
       return `<div class="wp-week-col${date === today ? ' today' : ''}">
         <div class="wp-week-head"><b>${Utils.weekdayShort(date)}</b><span class="muted small">${date.slice(5)}</span>${date === today ? chip('Today', 'var(--c-primary)') : ''}</div>
         <div class="wp-week-body">${entries.length ? entries.map(e => this.sessionRow(e)).join('') : '<p class="muted small wp-empty">—</p>'}</div>
+        <button type="button" class="wp-week-add" data-wp-action="add-day" data-wp-date="${date}" ${date < today ? 'disabled' : ''}>${icon('plus')} Add</button>
       </div>`;
     }).join('');
     return `<div class="wp-week-grid">${cols}</div>
@@ -426,10 +484,11 @@ const WeeklyPlanner = {
     if (this.dayTab !== 'All' && !this.dates(week).includes(this.dayTab)) this.dayTab = 'All';
     const assignments = this.assignments(week), counts = this.summary(assignments), { invalid } = this.records();
     const label = week === current ? 'This week' : week < current ? 'Past week' : 'Future week';
+    const canCopy = Utils.addDays(week, 6) >= today && this.assignments(Utils.addDays(week, -7)).length > 0;
     const filtered = this.dayTab === 'All' ? assignments : assignments.filter(a =>
       a.sessions.some(s => !s.cancelled_at && s.date === this.dayTab));
     container.innerHTML = `<div class="page-head"><div><h2>Weekly Planner</h2><p class="muted small">Friday → Thursday · your tasks, your days</p></div>
-      <div class="wp-actions"><button class="btn" data-wp-action="new-task">${icon('plus')} New task</button><button class="btn" data-wp-action="png" title="Download this week as a high-quality PNG image">${icon('image')} PNG</button><button class="btn btn-primary" data-wp-action="add" ${Utils.addDays(week, 6) < today ? 'disabled' : ''}>${icon('calendar-plus')} Add to week</button></div></div>
+      <div class="wp-actions"><button class="btn" data-wp-action="new-task">${icon('plus')} New task</button><button class="btn" data-wp-action="copy" ${canCopy ? '' : 'disabled'} title="Start this week from last week's plan">${icon('copy')} Copy last week</button><button class="btn" data-wp-action="png" title="Download this week as a high-quality PNG image">${icon('image')} PNG</button><button class="btn btn-primary" data-wp-action="add" ${Utils.addDays(week, 6) < today ? 'disabled' : ''}>${icon('calendar-plus')} Add to week</button></div></div>
       <div class="card wp-toolbar"><div class="wp-week-nav"><button class="btn btn-icon btn-ghost" data-wp-action="prev" aria-label="Previous week">${icon('chevron-left')}</button><div><b>${Utils.fmtDate(week)} – ${Utils.fmtDate(Utils.addDays(week, 6))}</b><span class="muted small">${label}</span></div><button class="btn btn-icon btn-ghost" data-wp-action="forward" aria-label="Next week">${icon('chevron-right')}</button></div></div>
       ${invalid.length ? `<div class="banner banner-warn" role="alert">${invalid.length} saved weekly plan(s) could not be read. They have NOT been deleted or replaced. Sync, or restore a valid backup in Settings.</div>` : ''}
       <div class="wp-summary"><div class="card"><b>${counts.done}/${counts.total}</b><span>sessions done</span></div><div class="card"><b>${counts.missed}</b><span>missed</span></div><div class="card"><b>${counts.pending}</b><span>pending today</span></div><div class="card"><b>${counts.upcoming}</b><span>upcoming</span></div></div>
@@ -437,7 +496,7 @@ const WeeklyPlanner = {
       <p class="muted small wp-explainer">Only selected days count. A session check never completes the original Task. New Fridays do not copy unfinished sessions.</p>
       ${this.view === 'month' ? this.monthCalendarHtml() : this.view === 'week' ? this.weekGridHtml() : `
       <div class="wp-tabs" role="group" aria-label="Filter by day"><button class="tab ${this.dayTab === 'All' ? 'active' : ''}" data-wp-action="day" data-wp-date="All">All days</button>${this.dates(week).map(date => `<button class="tab ${this.dayTab === date ? 'active' : ''}${date === today ? ' wp-is-today' : ''}" data-wp-action="day" data-wp-date="${date}">${Utils.weekdayShort(date)} <span>${date.slice(8)}</span></button>`).join('')}</div>
-      <div class="stack wp-list">${filtered.length ? (this.dayTab === 'All' ? filtered.map(a => this.assignmentHtml(a)).join('') : this.sessionsOn(this.dayTab).map(e => this.sessionRow(e)).join('')) : emptyState('calendar-days', assignments.length ? 'No sessions on this day' : 'No tasks planned for this week', week < current ? 'This week has no saved plan.' : 'Choose an existing task and the days you want to work on it. Nothing repeats automatically.', Utils.addDays(week, 6) >= today ? '<button class="btn btn-primary" data-wp-action="add">Add to week</button>' : '')}</div>`}
+      <div class="stack wp-list">${filtered.length ? (this.dayTab === 'All' ? filtered.map(a => this.assignmentHtml(a)).join('') : this.sessionsOn(this.dayTab).map(e => this.sessionRow(e)).join('')) : emptyState('calendar-days', assignments.length ? 'No sessions on this day' : 'No tasks planned for this week', week < current ? 'This week has no saved plan.' : 'Choose an existing task and the days you want to work on it. Nothing repeats automatically.', Utils.addDays(week, 6) >= today ? '<button class="btn btn-primary" data-wp-action="add">Add to week</button>' + (canCopy ? ' <button class="btn" data-wp-action="copy">Copy last week</button>' : '') : '')}</div>`}
       ${this.legacyHtml()}`;
     container.onclick = e => this.handleClick(e);
   },
@@ -458,6 +517,8 @@ const WeeklyPlanner = {
     else if (action === 'open-day') return this.openDay(btn.dataset.wpDate);
     else if (action === 'new-task') Tasks.openForm();
     else if (action === 'png') this.exportPng().catch(e => App.handleError(e));
+    else if (action === 'copy') this.openCopy(this.week());
+    else if (action === 'add-day') this.openForm('', this.weekStart(btn.dataset.wpDate), [btn.dataset.wpDate]);
     else if (action === 'add' || action === 'next') {
       try {
         const a = key ? this.read(key) : null;
@@ -482,7 +543,7 @@ const WeeklyPlanner = {
     return true;
   },
 
-  openForm(taskId = '', week = this.week()) {
+  openForm(taskId = '', week = this.week(), presetDates = []) {
     const tasks = (App.state.tasks || []).filter(t => !t._archived && t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => a.title.localeCompare(b.title));
     const baselines = {};
@@ -492,7 +553,7 @@ const WeeklyPlanner = {
       body: `<p class="muted">${Utils.fmtDate(week)} – ${Utils.fmtDate(Utils.addDays(week, 6))} · Friday → Thursday</p>
         <p class="muted small">Select the days you will work on this task. Each day is a separate session, not a new Task.</p>
         <form id="wp-form"><label class="field"><span>Existing task *</span><select name="task_id" required aria-label="Existing task"><option value="">Choose a task…</option>${tasks.map(t => `<option value="${Utils.esc(t.id)}" ${t.id === taskId ? 'selected' : ''}>${Utils.esc(t.title)}</option>`).join('')}</select></label>
-        <fieldset class="wp-fieldset"><legend>Days to work *</legend><div class="wp-pick-days">${this.dates(week).map(date => `<label class="wp-pick"><input type="checkbox" name="dates" value="${date}" ${date < Utils.today() ? 'disabled' : ''}><span>${Utils.weekdayShort(date)}</span><b>${date.slice(8)}</b><small class="wp-pick-note">${date < Utils.today() ? 'Past day' : 'Available'}</small></label>`).join('')}</div></fieldset>
+        <fieldset class="wp-fieldset"><legend>Days to work *</legend><div class="wp-pick-days">${this.dates(week).map(date => `<label class="wp-pick"><input type="checkbox" name="dates" value="${date}" ${date < Utils.today() ? 'disabled' : presetDates.includes(date) ? 'checked' : ''}><span>${Utils.weekdayShort(date)}</span><b>${date.slice(8)}</b><small class="wp-pick-note">${date < Utils.today() ? 'Past day' : 'Available'}</small></label>`).join('')}</div></fieldset>
         <p id="wp-form-error" class="wp-form-error" role="alert"></p><p class="muted small">Past days cannot be added. Nothing carries over automatically.</p></form>
         <button class="btn btn-ghost btn-sm" data-wp-new-task>Task not listed? Create a task first</button>`,
       footer: '<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-save>Add selected days</button>'

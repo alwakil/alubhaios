@@ -308,6 +308,30 @@ await test('PNG export data builds 7 columns, labels and filename', () => {
   assert.ok(data.rangeLabel.includes('–'));
 });
 
+await test('Copy-last-week shifts days +7, locks past/planned and dead tasks', () => {
+  const rows = planner.copyPlanData('2026-11-20', '2026-11-27', '2026-11-27');
+  assert.equal(rows.length, 2);
+  const htb = rows.find(r => r.task_id === 'htb');
+  assert.ok(htb.active);
+  assert.deepEqual(htb.days.map(d => d.date), ['2026-11-28', '2026-12-01', '2026-12-02']); // same weekdays, next week
+  assert.equal(htb.days[0].taken, true); // Saturday already planned in the target week → locked
+  assert.ok(htb.days.slice(1).every(d => !d.past && !d.taken)); // free days stay copyable
+  const ctf = rows.find(r => r.task_id === 'ctf');
+  assert.deepEqual(ctf.days.map(d => d.date), ['2026-11-30', '2026-12-02']);
+  assert.equal(ctf.days[0].taken, true); // Monday already planned in the target week → locked
+  assert.ok(!ctf.days[1].taken && !ctf.days[1].past); // free target day stays copyable
+  task.status = 'completed';
+  assert.equal(planner.copyPlanData('2026-11-20', '2026-11-27', '2026-11-27').find(r => r.task_id === 'htb').active, false);
+  task.status = 'pending';
+});
+await test('Week grid offers per-day quick add, locked on past days', () => {
+  const future = planner.weekGridHtml('2026-11-27');
+  assert.equal((future.match(/data-wp-action="add-day"/g) || []).length, 7);
+  assert.equal((future.match(/data-wp-action="add-day"[^>]*disabled/g) || []).length, 0);
+  const past = planner.weekGridHtml('2026-11-20', '2026-11-27');
+  assert.equal((past.match(/data-wp-action="add-day"[^>]*disabled/g) || []).length, 7);
+});
+
 const failed = checks.filter(c => !c.pass);
 console.log(`\nWEEKLY PLANNER: ${checks.length - failed.length}/${checks.length} scenarios passed`);
 process.exitCode = failed.length ? 1 : 0;
