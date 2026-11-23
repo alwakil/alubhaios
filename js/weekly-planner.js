@@ -1,0 +1,384 @@
+/* ============================================================
+   AluBhaiOS — Weekly Planner (Friday → Thursday)
+   One settings record per task/week; concrete day sessions are
+   independent of task completion. Legacy routines stay intact.
+   ============================================================ */
+'use strict';
+
+const WeeklyPlanner = {
+  prefix: 'weekly_plan.v1.',
+  selectedWeek: null,
+  dayTab: 'All',
+  busy: new Set(),
+
+  validDate(date) {
+    return typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+      !!Utils.parseDate(date) && Utils.dateStr(Utils.parseDate(date)) === date;
+  },
+  validTime(time) {
+    return typeof time === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(time) &&
+      this.validDate(time.slice(0, 10)) && Number(time.slice(11, 13)) < 24 &&
+      Number(time.slice(14, 16)) < 60 && Number(time.slice(17, 19)) < 60;
+  },
+  weekStart(date = Utils.today()) {
+    if (!this.validDate(date)) throw new Error('Choose a valid date.');
+    return Utils.addDays(date, -((Utils.parseDate(date).getDay() + 2) % 7));
+  },
+  week() { return this.selectedWeek || this.weekStart(); },
+  dates(week = this.week()) { return Array.from({ length: 7 }, (_, i) => Utils.addDays(week, i)); },
+  key(week, taskId) { return this.prefix + week + '.' + encodeURIComponent(taskId); },
+  task(id) { return (App.state.tasks || []).find(t => t.id === id); },
+  clone(value) { return JSON.parse(JSON.stringify(value)); },
+
+  /** Validate before using a saved plan — malformed data is never overwritten. */
+  decode(key, raw) {
+    const a = JSON.parse(raw);
+    if (!a || a.version !== 1 || !this.validDate(a.week_start) || this.weekStart(a.week_start) !== a.week_start ||
+        typeof a.task_id !== 'string' || !a.task_id || key !== this.key(a.week_start, a.task_id) ||
+        typeof a.title !== 'string' || !a.title.trim() || typeof a.category !== 'string' ||
+        !this.validDate(a.effective_from) || !this.validTime(a.created_at) || !this.validTime(a.updated_at) ||
+        a.effective_from !== a.created_at.slice(0, 10) || !Array.isArray(a.sessions)) {
+      throw new Error('Unsupported or damaged weekly plan.');
+    }
+    const ids = new Set(), dates = new Set();
+    for (const s of a.sessions) {
+      if (!s || typeof s.id !== 'string' || !s.id || ids.has(s.id) ||
+          !this.validDate(s.date) || this.weekStart(s.date) !== a.week_start || s.date < a.effective_from ||
+          !this.validTime(s.added_at) || s.date < s.added_at.slice(0, 10) ||
+          typeof s.done_at !== 'string' || (s.done_at && (!this.validTime(s.done_at) || s.done_at.slice(0, 10) < s.date)) ||
+          typeof s.cancelled_at !== 'string' || (s.cancelled_at && !this.validTime(s.cancelled_at)) ||
+          (s.cancelled_at && s.done_at) || !Array.isArray(s.moves)) {
+        throw new Error('Unsupported or damaged weekly session.');
+      }
+      ids.add(s.id);
+      if (!s.cancelled_at) {
+        if (dates.has(s.date)) throw new Error('Duplicate weekly session.');
+        dates.add(s.date);
+      }
+      for (const move of s.moves) {
+        if (!move || !this.validDate(move.from) || !this.validDate(move.to) || !this.validTime(move.at) ||
+            this.weekStart(move.from) !== a.week_start || this.weekStart(move.to) !== a.week_start ||
+            move.to < move.at.slice(0, 10)) throw new Error('Damaged session move history.');
+      }
+    }
+    return a;
+  },
+  read(key) {
+    const raw = App.settings[key];
+    return raw === undefined ? null : this.decode(key, raw);
+  },
+  records() {
+    const plans = [], invalid = [];
+    Object.keys(App.settings).filter(k => k.startsWith(this.prefix)).forEach(key => {
+      try { plans.push({ key, ...this.decode(key, App.settings[key]) }); }
+      catch (e) { invalid.push(key); }
+    });
+    return { plans, invalid };
+  },
+  assignments(week = this.week()) {
+    return this.records().plans.filter(a => a.week_start === week)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.title.localeCompare(b.title));
+  },
+  status(session, today = Utils.today()) {
+    if (session.cancelled_at) return 'cancelled';
+    if (session.done_at) return session.done_at.slice(0, 10) > session.date ? 'late' : 'done';
+    return session.date < today ? 'missed' : session.date === today ? 'pending' : 'upcoming';
+  },
+  summary(assignments, today = Utils.today()) {
+    const counts = { total: 0, done: 0, missed: 0, pending: 0, upcoming: 0, cancelled: 0 };
+    assignments.forEach(a => a.sessions.forEach(s => {
+      const status = this.status(s, today);
+      if (status === 'cancelled') { counts.cancelled++; return; }
+      counts.total++;
+      counts[status === 'late' ? 'done' : status]++;
+    }));
+    return counts;
+  },
+  sessionsOn(date) {
+    return this.assignments(this.weekStart(date)).flatMap(assignment => assignment.sessions
+      .filter(s => s.date === date && !s.cancelled_at)
+      .map(session => ({ assignment, session, title: assignment.title, status: this.status(session) })));
+  },
+
+  /** Compare-and-set writes prevent another device's session update being lost. */
+  async save(key, expectedRaw, assignment) {
+    if (!App.online) throw new Error('Connect and sync before changing your weekly plan.');
+    if (this.busy.has(key)) throw new Error('This plan is already saving. Please wait.');
+    if (App.settings[key] !== expectedRaw) throw new Error('This plan changed. Reopen it and try again.');
+    const next = this.clone(assignment);
+    delete next.key;
+    next.updated_at = Utils.nowISO();
+    const raw = JSON.stringify(next);
+    this.decode(key, raw);
+    this.busy.add(key);
+    try { await API.savePlannerRecord(key, expectedRaw, raw); }
+    finally { this.busy.delete(key); }
+    App.refreshCurrent();
+    return next;
+  },
+  async add(taskId, week, chosenDates, expectedRaw) {
+    if (arguments.length < 4) expectedRaw = App.settings[this.key(week, taskId)];
+    const task = this.task(taskId), today = Utils.today();
+    if (!task || task._archived || task.status === 'completed' || task.status === 'cancelled') {
+      throw new Error('Choose an active, incomplete task from Tasks.');
+    }
+    if (!this.validDate(week) || this.weekStart(week) !== week) throw new Error('Choose a Friday-based week.');
+    if (!chosenDates.length || new Set(chosenDates).size !== chosenDates.length || chosenDates.some(d =>
+        !this.validDate(d) || this.weekStart(d) !== week || d < today)) {
+      throw new Error('Select at least one available day from today onward in this week.');
+    }
+    const key = this.key(week, taskId), now = Utils.nowISO();
+    const a = expectedRaw === undefined ? {
+      version: 1, week_start: week, task_id: taskId, title: task.title, category: task.category || 'Other',
+      effective_from: today, created_at: now, updated_at: now, sessions: []
+    } : this.decode(key, expectedRaw);
+    if (chosenDates.some(d => a.sessions.some(s => s.date === d && !s.cancelled_at))) {
+      throw new Error('This task is already planned on one of those days.');
+    }
+    chosenDates.sort().forEach(date => a.sessions.push({
+      id: Utils.uid(), date, added_at: now, done_at: '', cancelled_at: '', moves: []
+    }));
+    return this.save(key, expectedRaw, a);
+  },
+  async toggle(key, sessionId, expectedRaw = App.settings[key]) {
+    const a = this.decode(key, expectedRaw), s = a.sessions.find(s => s.id === sessionId);
+    if (!s || s.cancelled_at || s.date > Utils.today()) throw new Error('Only today or past sessions can be checked.');
+    s.done_at = s.done_at ? '' : Utils.nowISO();
+    return this.save(key, expectedRaw, a);
+  },
+  async move(key, sessionId, date, expectedRaw = App.settings[key]) {
+    const a = this.decode(key, expectedRaw), s = a.sessions.find(s => s.id === sessionId);
+    if (!s || s.done_at || s.cancelled_at || !this.validDate(date) || date < Utils.today() ||
+        this.weekStart(date) !== a.week_start || date === s.date) {
+      throw new Error('Move an unfinished session to today or a future day in the same week.');
+    }
+    if (a.sessions.some(x => x.id !== s.id && x.date === date && !x.cancelled_at)) {
+      throw new Error('This task already has a session on that day.');
+    }
+    s.moves.push({ from: s.date, to: date, at: Utils.nowISO() });
+    s.date = date;
+    return this.save(key, expectedRaw, a);
+  },
+  async cancel(key, sessionId, expectedRaw = App.settings[key]) {
+    const a = this.decode(key, expectedRaw), s = a.sessions.find(s => s.id === sessionId);
+    if (!s || s.done_at || s.cancelled_at || s.date < Utils.today()) {
+      throw new Error('Only an unfinished session today or in the future can be removed from the plan.');
+    }
+    s.cancelled_at = Utils.nowISO();
+    return this.save(key, expectedRaw, a);
+  },
+  async resetProgress(type, today = Utils.today()) {
+    const { plans, invalid } = this.records();
+    if (invalid.length) throw new Error('A weekly plan is damaged. No weekly progress was reset; restore a valid backup first.');
+    const from = type === 'today' ? today : Utils.addDays(today, -6);
+    let count = 0;
+    for (const a of plans) {
+      const changed = a.sessions.filter(s => s.done_at && (type === 'progress' ||
+        (s.done_at.slice(0, 10) >= from && s.done_at.slice(0, 10) <= today)));
+      if (!changed.length) continue;
+      const expected = App.settings[a.key];
+      changed.forEach(s => { s.done_at = ''; });
+      await this.save(a.key, expected, a);
+      count += changed.length;
+    }
+    return count;
+  },
+
+  statusChip(status) {
+    const names = { done: 'Done', late: 'Done · late', missed: 'Missed', pending: 'Pending', upcoming: 'Upcoming', cancelled: 'Removed' };
+    const colors = { done: '#10b981', late: '#10b981', missed: '#ef4444', pending: '#f59e0b', upcoming: '#64748b', cancelled: '#64748b' };
+    return chip(names[status], colors[status]);
+  },
+  button(action, key, sessionId, label, extra = '') {
+    return `<button type="button" class="btn btn-sm ${extra}" data-wp-action="${action}" data-wp-key="${Utils.esc(key)}" data-wp-session="${Utils.esc(sessionId || '')}" ${this.busy.has(key) ? 'disabled' : ''}>${label}</button>`;
+  },
+  dayButtons(a) {
+    return `<div class="wp-days">${this.dates(a.week_start).map(date => {
+      const s = a.sessions.find(s => s.date === date && !s.cancelled_at), status = s ? this.status(s) : 'off';
+      const name = Utils.weekdayShort(date), today = date === Utils.today();
+      return `<button type="button" class="wp-day ${status}${today ? ' today' : ''}" ${s ? `data-wp-action="session" data-wp-key="${Utils.esc(a.key)}" data-wp-session="${Utils.esc(s.id)}"` : 'disabled'} aria-label="${Utils.esc(name + ' ' + date + ' — ' + (s ? status : 'not planned'))}">
+        <span>${name}</span><b>${s ? (status === 'done' || status === 'late' ? '✓' : '●') : '—'}</b><small>${date.slice(8)}</small>
+      </button>`;
+    }).join('')}</div>`;
+  },
+  taskNote(a) {
+    const task = this.task(a.task_id);
+    if (!task) return 'Original task deleted · history kept';
+    if (task._archived) return 'Original task archived · history kept';
+    if (task.status === 'completed') return 'Original task completed · session checks stay separate';
+    return task.title !== a.title ? 'Task renamed to: ' + task.title : 'Session Done ≠ original Task Done';
+  },
+  assignmentHtml(a) {
+    const counts = this.summary([a]), task = this.task(a.task_id);
+    const active = task && !task._archived && task.status !== 'completed' && task.status !== 'cancelled';
+    const daysLeft = this.dates(a.week_start).some(d => d >= Utils.today());
+    const moves = a.sessions.flatMap(s => s.moves.map(m => `<li>${Utils.esc(Utils.fmtDay(m.from))} → ${Utils.esc(Utils.fmtDay(m.to))} <span class="muted">(${Utils.fmtDate(m.at.slice(0, 10))})</span></li>`));
+    const removed = a.sessions.filter(s => s.cancelled_at).map(s => `<li>${Utils.fmtDay(s.date)} — removed on ${Utils.fmtDate(s.cancelled_at.slice(0, 10))}</li>`);
+    return `<article class="card wp-assignment">
+      <div class="wp-card-head"><div class="wp-task-main"><h3>${Utils.esc(a.title)}</h3><div class="task-meta">${chip(a.category, Utils.categoryColor(a.category))}<span class="muted small">Added ${Utils.fmtDate(a.created_at.slice(0, 10))}</span></div></div>
+        <b class="wp-progress">${counts.done}/${counts.total}<small>sessions done</small></b></div>
+      <p class="muted small wp-task-note">${Utils.esc(this.taskNote(a))}</p>
+      ${this.dayButtons(a)}
+      <div class="wp-card-foot"><div class="task-meta">${counts.missed ? chip(counts.missed + ' missed', '#ef4444') : ''}${counts.pending ? chip(counts.pending + ' pending', '#f59e0b') : ''}${counts.upcoming ? chip(counts.upcoming + ' upcoming', '#64748b') : ''}</div>
+        <div class="wp-actions">${task ? this.button('task', a.key, '', 'Open task') : ''}${active && daysLeft ? this.button('add', a.key, '', '+ Add days') : ''}${active ? this.button('next', a.key, '', 'Plan next week') : ''}</div></div>
+      ${moves.length || removed.length ? `<details class="wp-history"><summary>Change history (${moves.length + removed.length})</summary><ul>${moves.concat(removed).join('')}</ul></details>` : ''}
+    </article>`;
+  },
+  sessionRow(entry) {
+    const { assignment: a, session: s, status } = entry;
+    return `<div class="wp-session-row"><div class="wp-task-main"><b>${Utils.esc(a.title)}</b><div class="task-meta">${this.statusChip(status)}<span class="muted small">Weekly session · not Task completion</span></div></div>
+      <div class="wp-actions">${this.button('session', a.key, s.id, 'Details')}${s.date <= Utils.today() ? this.button('toggle', a.key, s.id, s.done_at ? 'Undo' : 'Done', s.done_at ? '' : 'btn-success') : ''}</div></div>`;
+  },
+  todayHtml(date = Utils.today()) {
+    const entries = this.sessionsOn(date), { invalid } = this.records();
+    return `<div class="wp-today"><p class="muted small">Day sessions are separate from your original Tasks. <a class="link" href="#/routines">Open weekly plan</a></p>
+      ${invalid.length ? '<p class="banner banner-warn">Some weekly plans could not be read. Sync or restore a valid backup.</p>' : ''}
+      ${entries.length ? entries.map(e => this.sessionRow(e)).join('') : `<p class="muted">No weekly sessions today. <a class="link" href="#/routines">Choose days for this week</a>.</p>`}</div>`;
+  },
+  legacyHtml() {
+    const routines = App.state.routines || [];
+    if (!routines.length) return '';
+    return `<details class="card wp-legacy"><summary>Previous routines (${routines.length}) · read-only</summary>
+      <p class="muted small">Saved for reference. Recurring task creation and reminders are retired; existing tasks and history are untouched. Add existing Tasks to your weekly plan instead.</p>
+      ${routines.map(r => `<div class="wp-legacy-row"><b>${Utils.esc(r.title)}</b><span class="muted small">${Utils.esc(r.days || 'Every day')} · ${Utils.esc(r.target_time || 'No time')}${r.duration_minutes ? ' · ' + Utils.fmtMinutes(r.duration_minutes) : ''}</span>${r.description ? `<p class="muted small">${Utils.esc(r.description)}</p>` : ''}</div>`).join('')}
+    </details>`;
+  },
+  page(container) {
+    const week = this.week(), current = this.weekStart(), today = Utils.today();
+    if (this.dayTab !== 'All' && !this.dates(week).includes(this.dayTab)) this.dayTab = 'All';
+    const assignments = this.assignments(week), counts = this.summary(assignments), { plans, invalid } = this.records();
+    const label = week === current ? 'This week' : week < current ? 'Past week' : 'Future week';
+    const filtered = this.dayTab === 'All' ? assignments : assignments.filter(a =>
+      a.sessions.some(s => !s.cancelled_at && s.date === this.dayTab));
+    const weeks = [...new Set([week, current, Utils.addDays(current, 7), ...plans.map(a => a.week_start)])].sort().reverse();
+    container.innerHTML = `<div class="page-head"><div><h2>Weekly Planner</h2><p class="muted small">Friday → Thursday · your tasks, your days</p></div>
+      <div class="wp-actions"><button class="btn" data-wp-action="new-task">${icon('plus')} New task</button><button class="btn btn-primary" data-wp-action="add" ${Utils.addDays(week, 6) < today ? 'disabled' : ''}>${icon('calendar-plus')} Add to week</button></div></div>
+      <div class="card wp-toolbar"><div class="wp-week-nav"><button class="btn btn-icon btn-ghost" data-wp-action="prev" aria-label="Previous week">${icon('chevron-left')}</button><div><b>${Utils.fmtDate(week)} – ${Utils.fmtDate(Utils.addDays(week, 6))}</b><span class="muted small">${label}</span></div><button class="btn btn-icon btn-ghost" data-wp-action="forward" aria-label="Next week">${icon('chevron-right')}</button></div>
+        <div class="wp-actions"><button class="btn btn-sm" data-wp-action="current">This week</button><label class="wp-week-select"><span class="muted small">Week / history</span><select id="wp-week-select" aria-label="Week history">${weeks.map(w => `<option value="${w}" ${w === week ? 'selected' : ''}>${Utils.fmtDate(w)} – ${Utils.fmtDate(Utils.addDays(w, 6))}</option>`).join('')}</select></label></div></div>
+      ${invalid.length ? `<div class="banner banner-warn" role="alert">${invalid.length} saved weekly plan(s) could not be read. They have NOT been deleted or replaced. Sync, or restore a valid backup in Settings.</div>` : ''}
+      <div class="wp-summary"><div class="card"><b>${counts.done}/${counts.total}</b><span>sessions done</span></div><div class="card"><b>${counts.missed}</b><span>missed</span></div><div class="card"><b>${counts.pending}</b><span>pending today</span></div><div class="card"><b>${counts.upcoming}</b><span>upcoming</span></div></div>
+      <p class="muted small wp-explainer">Only selected days count. A session check never completes the original Task. New Fridays do not copy unfinished sessions.</p>
+      <div class="wp-tabs" role="group" aria-label="Filter by day"><button class="tab ${this.dayTab === 'All' ? 'active' : ''}" data-wp-action="day" data-wp-date="All">All days</button>${this.dates(week).map(date => `<button class="tab ${this.dayTab === date ? 'active' : ''}${date === today ? ' wp-is-today' : ''}" data-wp-action="day" data-wp-date="${date}">${Utils.weekdayShort(date)} <span>${date.slice(8)}</span></button>`).join('')}</div>
+      <div class="stack wp-list">${filtered.length ? (this.dayTab === 'All' ? filtered.map(a => this.assignmentHtml(a)).join('') : this.sessionsOn(this.dayTab).map(e => this.sessionRow(e)).join('')) : emptyState('calendar-days', assignments.length ? 'No sessions on this day' : 'No tasks planned for this week', week < current ? 'This week has no saved plan.' : 'Choose an existing task and the days you want to work on it. Nothing repeats automatically.', Utils.addDays(week, 6) >= today ? '<button class="btn btn-primary" data-wp-action="add">Add to week</button>' : '')}</div>
+      ${this.legacyHtml()}`;
+    container.onclick = e => this.handleClick(e);
+    qs('#wp-week-select', container).addEventListener('change', e => this.goWeek(e.target.value));
+  },
+  goWeek(week) {
+    this.selectedWeek = week === this.weekStart() ? null : week;
+    this.dayTab = 'All';
+    App.refreshCurrent();
+  },
+  handleClick(e) {
+    const btn = e.target.closest('[data-wp-action]');
+    if (!btn || btn.disabled) return false;
+    const action = btn.dataset.wpAction, key = btn.dataset.wpKey, sessionId = btn.dataset.wpSession;
+    if (action === 'prev') this.goWeek(Utils.addDays(this.week(), -7));
+    else if (action === 'forward') this.goWeek(Utils.addDays(this.week(), 7));
+    else if (action === 'current') this.goWeek(this.weekStart());
+    else if (action === 'day') { this.dayTab = btn.dataset.wpDate; App.refreshCurrent(); }
+    else if (action === 'new-task') Tasks.openForm();
+    else if (action === 'add' || action === 'next') {
+      try {
+        const a = key ? this.read(key) : null;
+        this.openForm(a ? a.task_id : '', action === 'next' ? Utils.addDays(a.week_start < this.weekStart() ? this.weekStart() : a.week_start, 7) : this.week());
+      } catch (err) { App.handleError(err); }
+    } else if (action === 'session') this.openSession(key, sessionId);
+    else if (action === 'task') {
+      try {
+        const a = this.read(key), task = a && this.task(a.task_id);
+        if (!task) return true;
+        Tasks.showArchived = !!task._archived;
+        Tasks.view = 'list';
+        Tasks.filter = { status: '', category: '', priority: '', goal: '', date: '', search: task.title };
+        location.hash = '#/tasks';
+        App.route();
+      } catch (err) { App.handleError(err); }
+    } else if (action === 'toggle') {
+      btn.disabled = true;
+      this.toggle(key, sessionId).then(() => toast('Weekly session saved — original Task unchanged.', 'success'))
+        .catch(err => App.handleError(err)).finally(() => { btn.disabled = false; });
+    }
+    return true;
+  },
+
+  openForm(taskId = '', week = this.week()) {
+    const tasks = (App.state.tasks || []).filter(t => !t._archived && t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => a.title.localeCompare(b.title));
+    const baselines = {};
+    tasks.forEach(t => { baselines[this.key(week, t.id)] = App.settings[this.key(week, t.id)]; });
+    const m = openModal({
+      title: 'Add task to week',
+      body: `<p class="muted">${Utils.fmtDate(week)} – ${Utils.fmtDate(Utils.addDays(week, 6))} · Friday → Thursday</p>
+        <p class="muted small">Select the days you will work on this task. Each day is a separate session, not a new Task.</p>
+        <form id="wp-form"><label class="field"><span>Existing task *</span><select name="task_id" required aria-label="Existing task"><option value="">Choose a task…</option>${tasks.map(t => `<option value="${Utils.esc(t.id)}" ${t.id === taskId ? 'selected' : ''}>${Utils.esc(t.title)}</option>`).join('')}</select></label>
+        <fieldset class="wp-fieldset"><legend>Days to work *</legend><div class="wp-pick-days">${this.dates(week).map(date => `<label class="wp-pick"><input type="checkbox" name="dates" value="${date}" ${date < Utils.today() ? 'disabled' : ''}><span>${Utils.weekdayShort(date)}</span><b>${date.slice(8)}</b><small class="wp-pick-note">${date < Utils.today() ? 'Past day' : 'Available'}</small></label>`).join('')}</div></fieldset>
+        <p id="wp-form-error" class="wp-form-error" role="alert"></p><p class="muted small">Past days cannot be added. Nothing carries over automatically.</p></form>
+        <button class="btn btn-ghost btn-sm" data-wp-new-task>Task not listed? Create a task first</button>`,
+      footer: '<button class="btn btn-ghost" data-cancel>Cancel</button><button class="btn btn-primary" data-save>Add selected days</button>'
+    });
+    const form = qs('#wp-form', m.overlay), select = qs('[name="task_id"]', m.overlay), error = qs('#wp-form-error', m.overlay);
+    const update = () => {
+      let a = null, damaged = false;
+      try { a = select.value ? this.read(this.key(week, select.value)) : null; } catch (e) { damaged = true; }
+      qsa('[name="dates"]', m.overlay).forEach(input => {
+        const past = input.value < Utils.today(), used = a && a.sessions.some(s => s.date === input.value && !s.cancelled_at);
+        input.disabled = past || !!used || damaged;
+        if (input.disabled) input.checked = false;
+        qs('.wp-pick-note', input.parentElement).textContent = damaged ? 'Unreadable plan' : past ? 'Past day' : used ? 'Already planned' : 'Available';
+      });
+      error.textContent = damaged ? 'This saved plan cannot be read. Sync or restore a valid backup; it will not be overwritten.' : '';
+    };
+    select.addEventListener('change', update);
+    update();
+    qs('[data-cancel]', m.overlay).addEventListener('click', m.close);
+    qs('[data-wp-new-task]', m.overlay).addEventListener('click', () => { m.close(); Tasks.openForm(); });
+    const save = qs('[data-save]', m.overlay);
+    save.addEventListener('click', async () => {
+      if (save.disabled || !form.reportValidity()) return;
+      const id = select.value, chosen = qsa('[name="dates"]', m.overlay).filter(i => i.checked && !i.disabled).map(i => i.value);
+      if (!chosen.length) { error.textContent = 'Select at least one available day.'; return; }
+      save.disabled = true; select.disabled = true;
+      try {
+        await this.add(id, week, chosen, baselines[this.key(week, id)]);
+        m.close(); this.goWeek(week);
+        toast('Days added — original Task unchanged.', 'success');
+      } catch (e) { error.textContent = e.message; }
+      finally { save.disabled = false; select.disabled = false; }
+    });
+  },
+  openSession(key, sessionId) {
+    let a, s;
+    const expected = App.settings[key];
+    try { a = this.decode(key, expected); s = a.sessions.find(s => s.id === sessionId); }
+    catch (e) { App.handleError(e); return; }
+    if (!s || s.cancelled_at) return;
+    const editable = !s.done_at, past = s.date < Utils.today();
+    const alternatives = this.dates(a.week_start).filter(d => d >= Utils.today() && d !== s.date &&
+      !a.sessions.some(x => x.id !== s.id && x.date === d && !x.cancelled_at));
+    const m = openModal({
+      title: Utils.esc(a.title) + ' · ' + Utils.fmtDay(s.date),
+      body: `${this.statusChip(this.status(s))}<p class="muted small">${Utils.esc(this.taskNote(a))}</p>
+        <p>${s.done_at ? 'Checked on ' + Utils.fmtDate(s.done_at.slice(0, 10)) : past ? 'This selected day has passed. Mark it Done if you completed the work, or explicitly plan another session.' : 'Check this session when you have worked on the task for this day.'}</p>
+        ${editable && alternatives.length ? `<label class="field"><span>Reschedule within this week</span><select id="wp-move-date" aria-label="Reschedule day">${alternatives.map(d => `<option value="${d}">${Utils.fmtDay(d)}</option>`).join('')}</select></label><button class="btn btn-sm" data-move>Move session</button><p class="muted small">The old date stays in change history. Original Task dates do not change.</p>` : ''}
+        ${s.moves.length ? `<details class="wp-history"><summary>Move history</summary><ul>${s.moves.map(move => `<li>${Utils.fmtDay(move.from)} → ${Utils.fmtDay(move.to)}</li>`).join('')}</ul></details>` : ''}
+        <p class="wp-form-error" id="wp-session-error" role="alert"></p>`,
+      footer: `<button class="btn btn-ghost" data-close>Close</button>${editable && !past ? '<button class="btn btn-ghost danger" data-remove>Remove session</button>' : ''}${s.date <= Utils.today() ? `<button class="btn btn-primary" data-toggle>${s.done_at ? 'Undo session Done' : 'Mark session Done'}</button>` : ''}`
+    });
+    qs('[data-close]', m.overlay).addEventListener('click', m.close);
+    const run = async work => {
+      const buttons = qsa('button:not(.modal-close)', m.overlay);
+      buttons.forEach(b => { b.disabled = true; });
+      try { await work(); m.close(); toast('Weekly session saved — original Task unchanged.', 'success'); }
+      catch (e) { qs('#wp-session-error', m.overlay).textContent = e.message; }
+      finally { buttons.forEach(b => { b.disabled = false; }); }
+    };
+    const toggle = qs('[data-toggle]', m.overlay), move = qs('[data-move]', m.overlay), remove = qs('[data-remove]', m.overlay);
+    if (toggle) toggle.addEventListener('click', () => run(() => this.toggle(key, sessionId, expected)));
+    if (move) move.addEventListener('click', () => run(() => this.move(key, sessionId, qs('#wp-move-date', m.overlay).value, expected)));
+    if (remove) remove.addEventListener('click', async () => {
+      const ok = await confirmDialog({ title: 'Remove this session?', message: `Remove the ${Utils.fmtDay(s.date)} session from your plan? The original Task and a removal record will be kept.`, confirmText: 'Remove session' });
+      if (ok) run(() => this.cancel(key, sessionId, expected));
+    });
+  }
+};

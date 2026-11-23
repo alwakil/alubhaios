@@ -38,7 +38,11 @@ Everything from PersonalOS v1.6.1, plus:
 - **⚡ Supabase backend** — saves drop from 5–15 s (Apps Script) to ~0.2 s; no cold starts, no daily execution limits.
 - **⚠️ XP penalty for missed work** — missed tasks (−5), unchecked habits (−2) and unmarked salat (−2) on past days cut your XP (capped −15/day, never below 0, only counts days after you first open the app). Complete the missed task later and the XP comes back automatically.
 
-All original features: installable PWA, dashboard with productivity score + XP/level, Today page with missed-task alert, tasks (filters/projects/archive), goal hierarchy + plan-my-week, routines with notifications, habit streaks + freezes + heatmap, stopwatch/pomodoro focus timer, Salah tracker with reminders, 23 badges, 8+ analytics charts + year heatmap, smart insights, fishbone diagram, daily/weekly reviews with auto reports, keyboard shortcuts, custom dropdown options, full reset system with typed `RESET` gates.
+- **Weekly Planner** — assign existing Tasks to explicit **Friday–Thursday** day sessions. Session Done stays separate from Task Done, XP and productivity statistics; unfinished sessions never carry over automatically. Today and the Tasks month calendar show the chosen sessions.
+- **Legacy routines retained** — previous routines, generated tasks and history remain available for reference, but recurring creation, editing and routine reminders are retired.
+- **No SQL migration for weekly plans** — versioned per-assignment records live in `settings` under `weekly_plan.v1.*`. Compare-and-set saves reject stale cross-device changes; sync and retry after a conflict. Ordinary resets only clear session completion, preserving plans and change history; Reset Everything removes them.
+
+All original features: installable PWA, dashboard with productivity score + XP/level, Today page with missed-task alert, tasks (filters/projects/archive), goal hierarchy + plan-my-week, read-only legacy routines, habit streaks + freezes + heatmap, stopwatch/pomodoro focus timer, Salah tracker with reminders, 23 badges, 8+ analytics charts + year heatmap, smart insights, fishbone diagram, daily/weekly reviews with auto reports, keyboard shortcuts, custom dropdown options, full reset system with typed `RESET` gates.
 
 ---
 

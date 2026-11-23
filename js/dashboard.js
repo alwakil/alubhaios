@@ -241,9 +241,7 @@ const Dashboard = {
     const top3 = tasksToday.filter(t => t.status !== 'completed').slice(0, 3);
     const top3Ids = top3.map(t => t.id);
 
-    const routines = (App.state.routines || [])
-      .filter(r => r.enabled !== false && (String(r.days || '').trim() === 'Every day' || String(r.days || '').split(',').map(s => s.trim()).includes(wd)))
-      .sort((a, b) => String(a.target_time).localeCompare(String(b.target_time)));
+    const sessions = WeeklyPlanner.sessionsOn(today);
 
     const goalsToday = [];
     (App.state.tasks || []).forEach(t => {
@@ -304,8 +302,8 @@ const Dashboard = {
         })()}
         <div class="section-subhead">Top priorities</div>
         <div id="today-top3"></div>
-        <div class="section-subhead">Scheduled routines — ${Utils.esc(wd)}</div>
-        <div id="today-routines"></div>
+        <div class="section-subhead">Weekly sessions — ${Utils.esc(wd)}</div>
+        <div id="today-weekly-sessions"></div>
         <div class="section-subhead">Goals connected to today</div>
         <div id="today-goals"></div>
       </div>
@@ -334,7 +332,7 @@ const Dashboard = {
     `;
 
     // 🌅 morning briefing — behind-pace goals render as interactive pace bars
-    const brief = this.morningBriefing(tasksToday, routines, today);
+    const brief = this.morningBriefing(tasksToday, sessions, today);
     qs('#today-brief', container).innerHTML = brief.map(i => {
       if (i.pace) {
         const pc = i.pace.state === 'behind' ? '#ef4444' : i.pace.state === 'slightly' ? '#f59e0b' : '#10b981';
@@ -368,39 +366,8 @@ const Dashboard = {
       ? `<ol class="priority-list">${top3.map(t => `<li><span class="pl-title">${Utils.esc(t.title)}</span>${t.id === (frog && frog.id) ? chip('🐸 frog', '#f97316') : ''}${chip(t.priority, Utils.priorityColor(t.priority))}</li>`).join('')}</ol>`
       : `<p class="muted">No open priorities today — add tasks or enjoy the clear runway.</p>`;
 
-    // routines timeline — UPGRADED: past/now/upcoming states + streak chips + habit stacks + anytime tasks
-    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-    const entries = this.todayTimelineEntries(routines, tasksToday, nowMin);
-    const routineEntries = entries.filter(e => e.kind === 'routine');
-    const tasksEntry = entries.find(e => e.kind === 'tasks');
-    const stackMap = (typeof Habits !== 'undefined' && Habits.habitStack) ? Habits.habitStack() : {};
-    const stackedFor = routineId => (App.state.habits || []).filter(h =>
-      h.enabled !== false && stackMap[h.id] === routineId && !Analytics.habitDates(h.id).has(today));
-    qs('#today-routines', container).innerHTML = routineEntries.length
-      ? `<div class="routine-timeline">${routineEntries.map(e => `
-          <div class="routine-row ${e.state}">
-            <span class="routine-time">${Utils.esc(e.time)}</span>
-            <span class="routine-dot"></span>
-            <span class="routine-name">${Utils.esc(e.title)}</span>
-            ${e.dur ? `<span class="muted">${Utils.fmtMinutes(e.dur)}</span>` : ''}
-            ${e.streak > 0 ? chip('🔥 ' + e.streak + 'd', '#f97316') : ''}
-            ${e.state === 'now' ? chip('NOW', 'var(--c-primary)') : ''}
-          </div>
-          ${stackedFor(e.routineId).map(h => `
-          <div class="routine-row habit-stack">
-            <span class="routine-time">↳</span>
-            <span class="routine-dot"></span>
-            <span class="routine-name">🔗 ${Utils.esc(h.title)}</span>
-            <button class="btn btn-sm" data-habit="${h.id}" title="Mark habit done">${icon('check')} done</button>
-          </div>`).join('')}`).join('')}
-        <div class="routine-row anytime">
-          <span class="routine-time">${icon('list-check')}</span>
-          <span class="routine-dot"></span>
-          <span class="routine-name">Anytime tasks</span>
-          <span class="muted">${tasksEntry.doneCount} done · ${tasksEntry.pending} pending</span>
-          ${tasksEntry.titles.map(t2 => chip(Utils.esc(t2), '#64748b')).join('')}
-        </div></div>`
-      : `<p class="muted">No routines scheduled for ${Utils.esc(wd)}${tasksToday.length ? ' — ' + tasksToday.length + ' flexible task' + (tasksToday.length > 1 ? 's' : '') + ' anytime.' : '.'}</p>`;
+    // Weekly sessions are not Tasks and never enter task/XP statistics.
+    qs('#today-weekly-sessions', container).innerHTML = WeeklyPlanner.todayHtml(today);
 
     // goals connected to today
     qs('#today-goals', container).innerHTML = goalsToday.length
@@ -455,23 +422,17 @@ const Dashboard = {
 
   /** 🌅 Morning briefing — one glance at the whole day, from real data.
       Pure builder (testable). Returns [{icon, tone, text}]. */
-  morningBriefing(tasksToday, routines, today) {
+  morningBriefing(tasksToday, sessions, today) {
     const lines = [];
     const pend = tasksToday.filter(t => t.status !== 'completed');
     lines.push({
       icon: 'list-check', tone: 'info',
-      text: `${tasksToday.length} task${tasksToday.length !== 1 ? 's' : ''} today (${pend.length} pending) · ${routines.length} routine${routines.length !== 1 ? 's' : ''}`
+      text: `${tasksToday.length} task${tasksToday.length !== 1 ? 's' : ''} today (${pend.length} pending) · ${sessions.length} weekly session${sessions.length !== 1 ? 's' : ''}`
     });
     const frog = this.frogTask(tasksToday);
     if (frog) lines.push({ icon: 'fire', tone: 'warn', text: `🐸 Eat the frog first: ${frog.title}` });
     const qw = pend.filter(t => Utils.num(t.estimated_minutes) > 0 && Utils.num(t.estimated_minutes) <= 5).length;
     if (qw) lines.push({ icon: 'bolt', tone: 'info', text: `⚡ ${qw} quick win${qw > 1 ? 's' : ''} under 5 min — clear them in one burst.` });
-    let bestR = null, bestS = 0;
-    routines.forEach(r => {
-      const s = (typeof Routines !== 'undefined' && Routines.routineStreak) ? Routines.routineStreak(r) : 0;
-      if (s > bestS) { bestS = s; bestR = r; }
-    });
-    if (bestS >= 2) lines.push({ icon: 'fire', tone: 'good', text: `🔥 "${bestR.title}" is on a ${bestS}-day streak — don't break the chain.` });
     // goal pace rows — EVERY active goal with a target date gets a bar
     // (red behind · amber slightly · green on-track), soonest deadline first
     const paceRows = [];
@@ -586,6 +547,7 @@ const Dashboard = {
 
   /* Shared click handling for dashboard + today */
   onClick(e) {
+    if (typeof WeeklyPlanner !== 'undefined' && WeeklyPlanner.handleClick(e)) return;
     const mbtn = e.target.closest('[data-missed-act]');
     if (mbtn) {
       const id = mbtn.closest('[data-id]').dataset.id;

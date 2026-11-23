@@ -316,6 +316,33 @@ const API = {
     return { settings: settingsObj };
   },
 
+  /** Per-assignment compare-and-set: never merge a stale weekly plan. */
+  async savePlannerRecord(key, expectedRaw, valueRaw) {
+    if (typeof key !== 'string' || !key.startsWith('weekly_plan.v1.') ||
+        typeof valueRaw !== 'string' || (expectedRaw !== undefined && typeof expectedRaw !== 'string')) {
+      throw new Error('Invalid weekly plan record. Sync and try again.');
+    }
+    const rows = expectedRaw === undefined
+      ? await this.rest('settings', {
+          method: 'POST',
+          body: { key: key, value: valueRaw },
+          prefer: 'resolution=ignore-duplicates,return=representation'
+        })
+      : await this.rest('settings', {
+          method: 'PATCH',
+          qs: '?key=eq.' + encodeURIComponent(key) + '&value=eq.' + encodeURIComponent(expectedRaw) + '&select=*',
+          body: { value: valueRaw },
+          prefer: 'return=representation'
+        });
+    if (!Array.isArray(rows) || rows.length !== 1) {
+      const err = new Error('Weekly plan changed on another device. Sync and try again.');
+      err.code = 'CONFLICT';
+      throw err;
+    }
+    if (window.App && App.settings) App.settings[key] = valueRaw;
+    return rows[0];
+  },
+
   async archiveOldData(days) {
     const cutoff = Utils.addDays(Utils.today(), -(Number(days) || 120));
     const old = (((window.App && App.state) && App.state.tasks) || []).filter(t => !t._archived && t.status === 'completed' &&
@@ -377,6 +404,10 @@ const API = {
       await del('settings', '?key=not.is.null');
     } else {
       throw new Error('Unknown reset type: ' + type + ' (use today | week | progress | everything)');
+    }
+    if ((type === 'today' || type === 'week' || type === 'progress') &&
+        typeof WeeklyPlanner !== 'undefined' && WeeklyPlanner.resetProgress) {
+      counts.weekly_sessions_reset = await WeeklyPlanner.resetProgress(type, today);
     }
     return { type: type, counts: counts };
   },

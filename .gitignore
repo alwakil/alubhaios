@@ -1,4 +1,10 @@
-dev/
+dev/*
+!dev/test-weekly-planner.mjs
+!dev/test-weekly-integration.mjs
+!dev/test-routine-tasks.mjs
+!dev/test-rt-week-v2.mjs
+!dev/weekly-planner-fixture.js
+!dev/weekly-planner-server.mjs
 Thumbs.db
 .DS_Store
 *.log

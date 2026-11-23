@@ -9,7 +9,7 @@ const PAGES = {
   today:     { title: 'Today',     render: c => Dashboard.renderToday(c) },
   tasks:     { title: 'Tasks',     render: c => Tasks.page(c) },
   goals:     { title: 'Goals',     render: c => Goals.page(c) },
-  routines:  { title: 'Routines',  render: c => Routines.page(c) },
+  routines:  { title: 'Weekly Planner', render: c => WeeklyPlanner.page(c) },
   habits:    { title: 'Habits',    render: c => Habits.page(c) },
   salah:     { title: 'Salah',     render: c => Salah.page(c) },
   badges:    { title: 'Badges',    render: c => Badges.page(c) },
@@ -63,8 +63,9 @@ const App = {
       try { navigator.serviceWorker.register('sw.js').catch(() => { /* ignore */ }); } catch (e) { /* ignore */ }
     }
 
-    // routine + salah reminders (browser notifications, fire while the app is open)
-    setInterval(() => { this.checkRoutineReminders(); if (window.Salah) Salah.checkReminders(); }, 60000);
+    // Keep date-sensitive views current without closing an open modal.
+    this._lastDay = Utils.today();
+    setInterval(() => { this.checkDayRollover(); if (window.Salah) Salah.checkReminders(); }, 60000);
 
     this.online = navigator.onLine;
     await this.reload();
@@ -103,8 +104,7 @@ const App = {
     });
   },
 
-  /** Notify today's routines whose start time just arrived (0–10 min window). */
-  /* 🌅 v2.13.0 morning brief — a plan notification on the first app open of
+  /* v2.13.0 morning brief — a plan notification on the first app open of
      the morning window (5:00–12:00), once per day, toggleable in Settings. */
   morningBriefNotify() {
     try {
@@ -116,7 +116,7 @@ const App = {
       if (Utils.pref(key)) return;
       Utils.pref(key, true);
       const today = Utils.today();
-      const todays = (this.state.tasks || []).filter(t => t.scheduled_date === today && !t._archived);
+      const todays = (this.state.tasks || []).filter(t => t.scheduled_date === today && !t._archived && !String(t.project_id || '').startsWith('routine:'));
       const pend = todays.filter(t => t.status !== 'completed').length;
       const frog = (typeof Dashboard !== 'undefined' && Dashboard.frogTask) ? Dashboard.frogTask(todays) : null;
       const dl = (typeof Analytics !== 'undefined' && Analytics.deadlines) ? (Analytics.deadlines(7) || []).length : 0;
@@ -125,26 +125,14 @@ const App = {
     } catch (e) { /* never block boot */ }
   },
 
-  checkRoutineReminders() {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  /** Recurring legacy reminders are retired; old callers remain harmless. */
+  checkRoutineReminders() {},
+
+  checkDayRollover() {
     const today = Utils.today();
-    const wd = Utils.weekdayShort(today);
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    (App.state.routines || []).forEach(r => {
-      if (r.enabled === false) return;
-      const days = String(r.days || '').trim();
-      if (days !== 'Every day' && !days.split(',').map(s => s.trim()).includes(wd)) return;
-      if (!/^\d{1,2}:\d{2}/.test(String(r.target_time || ''))) return;
-      const parts = r.target_time.split(':');
-      const diff = nowMin - (Number(parts[0]) * 60 + Number(parts[1]));
-      if (diff < 0 || diff > 10) return;
-      const key = 'notified.' + today + '.' + r.id;
-      if (Utils.pref(key)) return;
-      Utils.pref(key, true);
-      notify('⏰ ' + r.target_time + ' — ' + r.title,
-        (r.duration_minutes ? Utils.fmtMinutes(r.duration_minutes) + ' — ' : '') + 'Time to start!');
-    });
+    if (today === this._lastDay) return;
+    this._lastDay = today;
+    if (this.current === 'today' || this.current === 'routines') this.refreshCurrent();
   },
 
   /* ---------------- data ---------------- */
@@ -179,8 +167,6 @@ const App = {
         API.rest('tasks', { method: 'GET', qs: '?select=id&due_date=not.is.null&limit=1' })
           .then(() => { this.dueDateSupported = true; if (this.current === 'tasks') this.refreshCurrent(); })
           .catch(() => { this.dueDateSupported = false; if (this.current === 'tasks' || this.current === 'settings') this.refreshCurrent(); });
-        // auto day tasks from routines (idempotent — once per routine per date)
-        if (typeof Routines !== 'undefined' && Routines.ensureTodayTasks) Routines.ensureTodayTasks().catch(() => {});
       }
     } catch (e) {
       this.online = false;
@@ -298,7 +284,7 @@ const App = {
   notifyMissed() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const missed = (this.state.tasks || []).filter(t =>
-      !t._archived && t.status !== 'completed' && t.scheduled_date && t.scheduled_date < Utils.today());
+      !t._archived && !String(t.project_id || '').startsWith('routine:') && t.status !== 'completed' && t.scheduled_date && t.scheduled_date < Utils.today());
     if (!missed.length) return;
     const key = 'notified.missed.' + Utils.today();
     if (Utils.pref(key)) return;

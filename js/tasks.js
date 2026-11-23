@@ -235,12 +235,11 @@ const Tasks = {
   },
   dayItems(date) {
     const tasks = (App.state.tasks || []).filter(t => !t._archived && String(t.scheduled_date || '').slice(0, 10) === date);
-    const wd = Utils.weekdayShort(date);
-    const routines = (App.state.routines || []).filter(r => r.enabled !== false && (typeof Routines !== 'undefined' ? Routines.coversDay(r, wd) : String(r.days || '') === 'Every day'));
-    return { tasks, routines };
+    const sessions = WeeklyPlanner.sessionsOn(date);
+    return { tasks, sessions };
   },
 
-  /** 📅 month calendar view — tasks + routine days on a real grid. */
+  /** Month calendar view — real tasks and separate weekly sessions. */
   renderCalendar() {
     const list = qs('#task-list', App.container());
     if (!list) return;
@@ -260,19 +259,18 @@ const Tasks = {
 
     const cells = this.monthDates(this.calY, this.calM).map(date => {
       if (!date) return '<div class="cal-cell blank"></div>';
-      const wd = Utils.weekdayShort(date);
       const tasks = byDate[date] || [];
       const pend = tasks.filter(t => t.status !== 'completed');
       const doneN = tasks.length - pend.length;
-      const rtN = (App.state.routines || []).filter(r => r.enabled !== false && (typeof Routines !== 'undefined' ? Routines.coversDay(r, wd) : String(r.days || '') === 'Every day')).length;
+      const sessionN = WeeklyPlanner.sessionsOn(date).length;
       const items = [];
       if (doneN) items.push(`<div class="cal-item done">✓ ${doneN} done</div>`);
       pend.slice(0, 2).forEach(t => items.push(`<div class="cal-item pending">${Utils.esc(t.title)}</div>`));
-      if (rtN) items.push(`<div class="cal-item routine">⏰ ${rtN} routine${rtN > 1 ? 's' : ''}</div>`);
-      const extra = tasks.length + rtN - items.length;
-      if (extra > 0) items.push(`<div class="cal-item more">+${extra} more</div>`);
+      if (sessionN) items.push(`<div class="cal-item routine">${icon('calendar-week')} ${sessionN} weekly session${sessionN > 1 ? 's' : ''}</div>`);
+      const extra = Math.max(0, pend.length - 2);
+      if (extra > 0) items.push(`<div class="cal-item more">+${extra} more tasks</div>`);
       return `
-        <button type="button" class="cal-cell${date === today ? ' today' : ''}${tasks.length || rtN ? ' has-items' : ''}" data-cal-day="${date}" title="Open ${date}">
+        <button type="button" class="cal-cell${date === today ? ' today' : ''}${tasks.length || sessionN ? ' has-items' : ''}" data-cal-day="${date}" title="Open ${date}">
           <span class="cal-daynum">${Number(date.slice(8))}</span>
           ${items.join('')}
         </button>`;
@@ -287,7 +285,7 @@ const Tasks = {
       </div>
       <div class="cal-weekdays">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => `<span>${w}</span>`).join('')}</div>
       <div class="cal-grid">${cells}</div>
-      <p class="muted small" style="margin-top:10px">Tap a day to see its tasks and routines · ✓ = completed · ⏰ = routine day.</p>`;
+      <p class="muted small" style="margin-top:10px">Tap a day to see its tasks and weekly sessions · ✓ = completed task · weekly session checks stay separate.</p>`;
 
     list.onclick = e => {
       const nav = e.target.closest('[data-cal-nav]');
@@ -303,14 +301,15 @@ const Tasks = {
   },
 
   showDayModal(date) {
-    const { tasks, routines } = this.dayItems(date);
+    const { tasks, sessions } = this.dayItems(date);
     const doneN = tasks.filter(t => t.status === 'completed').length;
     openModal({
       title: icon('calendar-days') + ' ' + Utils.fmtDay(date),
       body: `
         <div class="stack">
-          <div class="section-subhead">Routines</div>
-          ${routines.length ? routines.map(r => `<div class="muted">⏰ ${Utils.esc(r.target_time || '')} — ${Utils.esc(r.title)}</div>`).join('') : '<p class="muted small">None on this day.</p>'}
+          <div class="section-subhead">Weekly sessions (${sessions.length})</div>
+          ${sessions.length ? sessions.map(entry => `<div class="muted">${Utils.esc(entry.title)} — ${WeeklyPlanner.statusChip(entry.status)}</div>`).join('') : '<p class="muted small">None on this day.</p>'}
+          <p class="muted small">Sessions do not complete Tasks. <a class="link" href="#/routines">Open Weekly Planner</a></p>
           <div class="section-subhead">Tasks (${doneN}/${tasks.length} done)</div>
           ${tasks.length ? tasks.map(t => `<div class="muted">${t.status === 'completed' ? '✓' : '○'} ${Utils.esc(t.title)} ${chip(t.priority || 'medium', Utils.priorityColor(t.priority))}</div>`).join('') : '<p class="muted small">No tasks on this day.</p>'}
         </div>`

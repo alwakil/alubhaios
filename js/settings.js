@@ -84,7 +84,7 @@ const Settings = {
         <!-- Notifications -->
         <div class="card">
           <h3 class="card-title">${icon('bell')} Notifications</h3>
-          <p class="muted small" id="notif-status">Status: <b>${('Notification' in window) ? Notification.permission : 'unsupported'}</b> — routine reminders + pomodoro alerts.</p>
+          <p class="muted small" id="notif-status">Status: <b>${('Notification' in window) ? Notification.permission : 'unsupported'}</b> — Salah reminders + pomodoro alerts.</p>
           <p class="muted small">Reminders fire while the app is open (a pinned tab works great).</p>
           <button class="btn" id="notif-enable">${icon('bell')} Enable notifications</button>
           <label class="subs-check" style="margin-top:10px">
@@ -148,14 +148,14 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
         <div class="danger-row">
           <div>
             <b>Reset Today's Progress</b>
-            <p class="muted small">Un-completes tasks finished today, and deletes today's focus sessions, habit check-ins and daily review. Tasks themselves are kept.</p>
+            <p class="muted small">Un-completes tasks finished today, resets weekly sessions completed today, and deletes today's focus sessions, habit check-ins and daily review. Tasks, weekly plans and session history are kept.</p>
           </div>
           <button class="btn" id="reset-today">Reset today</button>
         </div>
         <div class="danger-row">
           <div>
             <b>Reset Weekly Progress</b>
-            <p class="muted small">Applies the same reset to every day of the current week (Monday–Sunday) and deletes this week's weekly review.</p>
+            <p class="muted small">Applies the same reset to weekly progress, including weekly session completions, and deletes this week's weekly review. Weekly plans and session history are kept.</p>
           </div>
           <button class="btn" id="reset-week">Reset week</button>
         </div>
@@ -163,14 +163,14 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
           <div>
             <b>Reset All Progress</b>
             <p class="muted small">Permanently deletes ALL productivity records: tasks, habit logs, focus sessions, daily & weekly reviews.
-              Goals, routines, habits and settings are kept.</p>
+              Weekly session completions are reset; weekly plans and session history, goals, legacy routines, habits and settings are kept.</p>
           </div>
           <button class="btn btn-danger" id="reset-progress">Reset all progress</button>
         </div>
         <div class="danger-row last">
           <div>
             <b>Reset Everything</b>
-            <p class="muted small">Wipes the complete database — every sheet including settings. Only use when you want a truly blank slate.</p>
+            <p class="muted small">Wipes the complete database — every table including settings, weekly plans and session history. Only use when you want a truly blank slate.</p>
           </div>
           <button class="btn btn-danger" id="reset-everything">Reset everything</button>
         </div>
@@ -188,7 +188,7 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
         <div class="danger-row last" style="border-top:1px solid var(--border)">
           <div>
             <b>${icon('shield-halved')} Backup & restore</b>
-            <p class="muted small">Download a JSON snapshot of every table (tasks, goals, sessions, logs, settings…). Keep it anywhere — restore it later to rebuild your database exactly.</p>
+            <p class="muted small">Download a JSON snapshot of every table (tasks, goals, sessions, logs, settings including weekly plans and session history…). Keep it anywhere — restore it later to rebuild your database exactly.</p>
             <input type="file" id="restore-file" accept="application/json,.json" style="display:none">
           </div>
           <div class="form-actions" style="flex-direction:column;align-items:stretch;gap:8px">
@@ -313,7 +313,7 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
       const ok = await askNotifyPermission();
       if (ok) toast('Notifications enabled 🔔', 'success');
       const st = qs('#notif-status', container);
-      if (st && 'Notification' in window) st.innerHTML = `Status: <b>${Notification.permission}</b> — routine reminders + pomodoro alerts.`;
+      if (st && 'Notification' in window) st.innerHTML = `Status: <b>${Notification.permission}</b> — Salah reminders + pomodoro alerts.`;
     });
     /* --- v2.13.0 toggles --- */
     qs('#set-goal-auto', container).addEventListener('change', async () => {
@@ -442,13 +442,7 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
       btn.innerHTML = `${icon('spinner', 'fa-spin')} Collecting…`;
       try {
         const data = await API.getAll();
-        const backup = {
-          app: 'AluBhaiOS',
-          version: CONFIG.VERSION,
-          exported_at: Utils.nowISO(),
-          tables: data
-        };
-        delete backup.tables.settingsRows;
+        const backup = this.buildBackup(data);
         const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -470,26 +464,26 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
     /* --- resets --- */
     qs('#reset-today', container).addEventListener('click', () => this.doReset('today', {
       title: "Reset today's progress?",
-      message: 'Tasks completed today become pending again, and today\'s focus sessions, habit check-ins and daily review are deleted. Tasks, habits and settings are kept.',
+      message: 'Tasks completed today become pending again, weekly sessions completed today are unchecked, and today\'s focus sessions, habit check-ins and daily review are deleted. Tasks, habits, settings, weekly plans and session history are kept.',
       confirmText: 'Reset today'
     }));
     qs('#reset-week', container).addEventListener('click', () => this.doReset('week', {
       title: 'Reset weekly progress?',
-      message: 'The same reset is applied to every day of the current week, and this week\'s weekly review is deleted.',
+      message: 'The same reset is applied to weekly progress, including weekly session completions, and this week\'s weekly review is deleted. Weekly plans and session history are kept.',
       confirmText: 'Reset week'
     }));
     qs('#reset-progress', container).addEventListener('click', () => this.doReset('progress', {
       title: 'WARNING: This action will permanently reset your productivity progress.',
       warning: 'All productivity records will be deleted.',
       message: 'Deleted: <b>all tasks, habit logs, focus sessions, daily reviews and weekly reviews</b>.' +
-               '<br>Kept: goals, routines, habits, settings and all application configuration.' +
+               '<br>Weekly session completions are reset. Kept: weekly plans and session history, goals, legacy routines, habits, settings and all application configuration.' +
                '<br><br>This cannot be undone.',
       confirmText: 'Reset all progress'
     }, true));
     qs('#reset-everything', container).addEventListener('click', () => this.doReset('everything', {
       title: 'WARNING: This action will permanently reset your productivity progress.',
       warning: 'The COMPLETE database will be wiped — including settings.',
-      message: 'Deleted: <b>everything in every sheet</b> — tasks, goals, routines, habits, logs, sessions, reviews AND settings.' +
+      message: 'Deleted: <b>everything in every table</b> — tasks, goals, routines, habits, logs, sessions, reviews AND settings, including weekly plans and session history.' +
                '<br><br>This cannot be undone.',
       confirmText: 'Reset everything'
     }, true));
@@ -511,25 +505,69 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
     });
   },
 
-  /** 💾 Restore a backup JSON: upserts every record by id (existing rows
-      update, new rows insert — nothing is deleted). Guarded by typed GO. */
+  /** Keep all settings in the snapshot, including per-assignment plans. */
+  buildBackup(data) {
+    const tables = Object.assign({}, data);
+    delete tables.settingsRows;
+    return {
+      app: 'AluBhaiOS', version: CONFIG.VERSION,
+      exported_at: Utils.nowISO(), tables: tables
+    };
+  },
+
+  /** Canonical backups use a settings object; older exports may use rows. */
+  backupSettingsRows(tables) {
+    const source = tables.settings !== undefined ? tables.settings : tables.settingsRows;
+    if (source === undefined) return [];
+    if (!source || typeof source !== 'object') throw new Error('Invalid backup settings. Restore cancelled.');
+    const rows = Array.isArray(source) ? source : Object.keys(source).map(key => ({ key: key, value: source[key] }));
+    const keys = new Set();
+    rows.forEach(row => {
+      if (!row || typeof row.key !== 'string' || !row.key || typeof row.value !== 'string' || keys.has(row.key)) {
+        throw new Error('Invalid or duplicate backup setting. Restore cancelled.');
+      }
+      keys.add(row.key);
+      if (row.key.startsWith('weekly_plan.')) {
+        if (typeof WeeklyPlanner === 'undefined' || !row.key.startsWith('weekly_plan.v1.')) {
+          throw new Error('Unsupported weekly plan in backup. Restore cancelled.');
+        }
+        WeeklyPlanner.decode(row.key, row.value);
+      }
+    });
+    return rows.map(row => ({ key: row.key, value: row.value }));
+  },
+
+  /** Restore rows after validation and typed confirmation. Plans use CAS. */
   async restoreFromFile(file) {
     if (!file) return;
     let backup;
     try { backup = JSON.parse(await file.text()); }
     catch (e) { return toast('Not a valid JSON file — restore cancelled.', 'error'); }
-    if (!backup || backup.app !== 'AluBhaiOS' || typeof backup.tables !== 'object') {
+    if (!backup || backup.app !== 'AluBhaiOS' || !backup.tables || typeof backup.tables !== 'object' || Array.isArray(backup.tables)) {
       return toast('This file is not an AluBhaiOS backup — restore cancelled.', 'error');
     }
-    const counts = {};
-    let total = 0;
+    let settingsRows;
+    try {
+      settingsRows = this.backupSettingsRows(backup.tables);
+      Object.keys(SB_TABLES).forEach(k => {
+        const rows = backup.tables[k];
+        if (rows !== undefined && (!Array.isArray(rows) || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row)))) {
+          throw new Error('Invalid backup table: ' + k + '. Restore cancelled.');
+        }
+      });
+    } catch (e) { return toast('Restore cancelled — ' + (e.message || e), 'error'); }
+    // Capture the expected raw values before confirmation; stale plans conflict.
+    const expectedPlans = new Map(settingsRows.filter(row => row.key.startsWith('weekly_plan.v1.'))
+      .map(row => [row.key, App.settings[row.key]]));
+    const counts = { settings: settingsRows.length };
+    let total = settingsRows.length;
     Object.keys(SB_TABLES).forEach(k => { counts[k] = (backup.tables[k] || []).length; total += counts[k]; });
     const ok = await typeConfirm({
       title: 'Restore backup?',
       warning: `Records will be written into your live database.`,
       message: `Backup from <b>${Utils.esc(String(backup.exported_at || 'unknown').slice(0, 10))}</b> contains <b>${total} records</b>: ` +
         Object.keys(counts).filter(k => counts[k]).map(k => `${counts[k]} ${k}`).join(', ') +
-        '.<br><br>Existing rows with the same id are <b>overwritten</b>; nothing is deleted. App version: ' + Utils.esc(backup.version || '?'),
+        '.<br><br>Existing rows with the same id/key are <b>overwritten</b>; nothing is deleted. Weekly plans and session history are included; newer device changes will conflict rather than be lost. App version: ' + Utils.esc(backup.version || '?'),
       confirmText: 'Restore now',
       keyword: 'RESTORE'
     });
@@ -538,16 +576,32 @@ ALTER TABLE archive ADD COLUMN IF NOT EXISTS due_date TEXT;</pre>
     // one bulk upsert per table (was one request per row — a 2000-record
     // backup used to fire 2000 POSTs)
     let done = 0, failed = 0;
+    const failures = [];
     for (const key of Object.keys(SB_TABLES)) {
       const rows = backup.tables[key] || [];
       if (!rows.length) continue;
       try {
         await API.upsertMany(SB_TABLES[key], rows.map(row => Object.assign({}, row)));
         done += rows.length;
-      } catch (e) { failed += rows.length; }
+      } catch (e) { failed += rows.length; failures.push(key + ': ' + (e.message || e)); }
     }
-    if (failed) toast(`⚠ Restored ${done}/${total} — ${failed} failed (check connection).`, 'warn');
-    else toast(`✅ Restore complete — ${done} records written. Reloading…`, 'success');
+    const ordinary = settingsRows.filter(row => !row.key.startsWith('weekly_plan.v1.'));
+    if (ordinary.length) {
+      try {
+        await API.upsertMany('settings', ordinary);
+        ordinary.forEach(row => { App.settings[row.key] = row.value; });
+        done += ordinary.length;
+      } catch (e) { failed += ordinary.length; failures.push('settings: ' + (e.message || e)); }
+    }
+    for (const row of settingsRows.filter(row => row.key.startsWith('weekly_plan.v1.'))) {
+      try {
+        await API.savePlannerRecord(row.key, expectedPlans.get(row.key), row.value);
+        done++;
+      } catch (e) { failed++; failures.push('weekly plans: ' + (e.message || e)); }
+    }
+    if (failed) toast(`Partial restore — ${done}/${total} records written; ${failed} failed. Successful writes were not rolled back. Sync and retry. ${failures.join(' · ')}`, 'warn');
+    else toast(`Restore complete — ${done} records written. Reloading…`, 'success');
     setTimeout(() => App.reload(), 1200);
+    return { done: done, failed: failed, total: total };
   }
 };
